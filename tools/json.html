@@ -437,6 +437,9 @@
                onkeydown="if(event.key==='Enter')loadFromURL()">
         <button class="btn primary" onclick="loadFromURL()">加载</button>
         <span class="url-progress" id="urlProgress"></span>
+        <div class="toolbar-divider"></div>
+        <button class="btn" onclick="document.getElementById('fileInput').click()">选择文件</button>
+        <input type="file" id="fileInput" accept=".json,application/json" style="display:none" onchange="loadFromFile(event)">
     </div>
 
     <!-- 状态栏 -->
@@ -998,7 +1001,43 @@
     const CORS_PROXIES = [
         url => 'https://corsproxy.io/?' + encodeURIComponent(url),
         url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+        url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
     ];
+
+    // ===== 本地文件加载 =====
+    function loadFromFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const progress = document.getElementById('urlProgress');
+        progress.classList.add('show');
+        progress.textContent = '读取中...';
+
+        const reader = new FileReader();
+        reader.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const mb = (e.loaded / 1048576).toFixed(1);
+                const pct = Math.round(e.loaded / e.total * 100);
+                progress.textContent = mb + ' MB (' + pct + '%)';
+            }
+        };
+        reader.onload = (e) => {
+            progress.textContent = '解析中...';
+            setTimeout(() => {
+                inputEl.value = e.target.result;
+                onInputChange();
+                progress.classList.remove('show');
+                const sizeMB = (file.size / 1048576).toFixed(1);
+                showToast('已加载文件: ' + file.name + ' (' + sizeMB + ' MB)', 'success');
+            }, 50);
+        };
+        reader.onerror = () => {
+            progress.classList.remove('show');
+            showToast('文件读取失败', 'error');
+        };
+        reader.readAsText(file);
+        // 重置 input 以便重复选择同一文件
+        event.target.value = '';
+    }
 
     async function loadFromURL() {
         const urlInput = document.getElementById('urlInput');
@@ -1028,7 +1067,7 @@
 
         if (text === null) {
             progress.classList.remove('show');
-            showToast('加载失败，可能是网络或跨域问题', 'error');
+            showToast('URL 加载失败(跨域限制)，请用"选择文件"按钮加载本地文件', 'error');
             return;
         }
 
