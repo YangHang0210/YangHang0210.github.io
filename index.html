@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yang's Toolbox</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding: 60px 20px 40px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+        .header p {
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+        .tools-grid {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+        }
+        .tool-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 28px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .tool-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tool-card:hover {
+            border-color: #475569;
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+        .tool-card:hover::before { opacity: 1; }
+        .tool-icon {
+            font-size: 2.2rem;
+            margin-bottom: 16px;
+            display: block;
+        }
+        .tool-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            color: #f1f5f9;
+        }
+        .tool-card p {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #475569;
+            font-size: 0.85rem;
+        }
+        .footer a { color: #64748b; text-decoration: none; }
+        .footer a:hover { color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Yang's Toolbox</h1>
+        <p>实用在线开发工具集</p>
+    </div>
+    <div class="tools-grid">
+        <a href="tools/json.html" class="tool-card">
+            <span class="tool-icon">{ }</span>
+            <h3>JSON 工具</h3>
+            <p>格式化、压缩、校验、树形视图，支持语法高亮与错误定位</p>
+        </a>
+        <!-- 后续工具在这里添加 -->
+    </div>
+    <div class="footer">
+        <p>&copy; 2026 YangHang | <a href="https://github.com/YangHang0210" target="_blank">GitHub</a></p>
+    </div>
+</body>
+</html>
