@@ -371,6 +371,7 @@
             <button class="btn primary" onclick="formatJSON()" title="Ctrl+Shift+F">格式化</button>
             <button class="btn" onclick="minifyJSON()" title="Ctrl+Shift+M">压缩</button>
             <button class="btn" onclick="validateJSON()">校验</button>
+            <button class="btn success" onclick="repairJSON()">修复</button>
         </div>
         <div class="toolbar-divider"></div>
         <div class="toolbar-group">
@@ -628,6 +629,134 @@
         showToast('键已按字母排序', 'success');
     }
 
+    function repairJSON() {
+        const raw = inputEl.value.trim();
+        if (!raw) { showToast('请输入 JSON', 'info'); return; }
+
+        const { ok } = parseInput();
+        if (ok) { showToast('JSON 已有效，无需修复', 'info'); return; }
+
+        try {
+            const repaired = tryRepairJSON(raw);
+            JSON.parse(repaired);
+            inputEl.value = repaired;
+            onInputChange();
+            showToast('修复成功！', 'success');
+        } catch (e) {
+            showToast('自动修复失败: ' + e.message, 'error');
+        }
+    }
+
+    function tryRepairJSON(input) {
+        let s = input;
+
+        // 1. 移除 BOM
+        s = s.replace(/^\uFEFF/, '');
+
+        // 2. 移除单行注释 // ... 和多行注释 /* ... */（在字符串外部）
+        s = removeJSONComments(s);
+
+        // 3. 单引号 → 双引号（仅在字符串外部）
+        s = replaceSingleQuotes(s);
+
+        // 4. 无引号的 key 加引号：{ key: → { "key":
+        s = s.replace(/([{,]\s*)([a-zA-Z_$][\w$]*)\s*:/g, '$1"$2":');
+
+        // 5. 移除尾逗号：,] → ] 和 ,} → }
+        s = s.replace(/,\s*([\]}])/g, '$1');
+
+        // 6. Python/JS 常量修复
+        s = s.replace(/\bNone\b/g, 'null');
+        s = s.replace(/\bTrue\b/g, 'true');
+        s = s.replace(/\bFalse\b/g, 'false');
+        s = s.replace(/\bundefined\b/g, 'null');
+        s = s.replace(/\bNaN\b/g, 'null');
+        s = s.replace(/\bInfinity\b/g, 'null');
+        s = s.replace(/\b-Infinity\b/g, 'null');
+
+        // 7. 补全缺失的闭合括号
+        s = balanceBrackets(s);
+
+        return s;
+    }
+
+    function removeJSONComments(s) {
+        let result = '';
+        let inString = false;
+        let stringChar = '';
+        let i = 0;
+        while (i < s.length) {
+            if (inString) {
+                if (s[i] === '\\') {
+                    result += s[i] + (s[i + 1] || '');
+                    i += 2;
+                    continue;
+                }
+                if (s[i] === stringChar) inString = false;
+                result += s[i];
+                i++;
+            } else {
+                if (s[i] === '"') {
+                    inString = true;
+                    stringChar = '"';
+                    result += s[i];
+                    i++;
+                } else if (s[i] === '/' && s[i + 1] === '/') {
+                    while (i < s.length && s[i] !== '\n') i++;
+                } else if (s[i] === '/' && s[i + 1] === '*') {
+                    i += 2;
+                    while (i < s.length - 1 && !(s[i] === '*' && s[i + 1] === '/')) i++;
+                    i += 2;
+                } else {
+                    result += s[i];
+                    i++;
+                }
+            }
+        }
+        return result;
+    }
+
+    function replaceSingleQuotes(s) {
+        let result = '';
+        let inDouble = false;
+        let inSingle = false;
+        let i = 0;
+        while (i < s.length) {
+            if (s[i] === '\\' && (inDouble || inSingle)) {
+                result += s[i] + (s[i + 1] || '');
+                i += 2;
+                continue;
+            }
+            if (!inSingle && s[i] === '"') {
+                inDouble = !inDouble;
+                result += '"';
+            } else if (!inDouble && s[i] === "'") {
+                inSingle = !inSingle;
+                result += '"';
+            } else {
+                result += s[i];
+            }
+            i++;
+        }
+        return result;
+    }
+
+    function balanceBrackets(s) {
+        const stack = [];
+        let inString = false;
+        for (let i = 0; i < s.length; i++) {
+            if (s[i] === '\\' && inString) { i++; continue; }
+            if (s[i] === '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (s[i] === '{') stack.push('}');
+            else if (s[i] === '[') stack.push(']');
+            else if (s[i] === '}' || s[i] === ']') {
+                if (stack.length && stack[stack.length - 1] === s[i]) stack.pop();
+            }
+        }
+        return s + stack.reverse().join('');
+    }
+
     function escapeJSON() {
         const raw = inputEl.value.trim();
         if (!raw) return;
@@ -805,10 +934,9 @@
             }
 
             // 折叠控制
-            toggle.onclick = function() {
+            function doToggle() {
                 const isCollapsed = childrenDiv.classList.contains('collapsed');
                 if (isCollapsed) {
-                    // 展开 - 先加载子节点
                     loadChildren();
                     childrenDiv.classList.remove('collapsed');
                     toggle.textContent = '▼';
@@ -822,11 +950,17 @@
                     bracketSpan.textContent = '';
                     sizeSpan.textContent = openBracket + '...' + closeBracket + ' ' + count + (isArray ? ' items' : ' keys');
                 }
+            }
+
+            toggle.onclick = function(e) {
+                e.stopPropagation();
+                doToggle();
             };
 
             headLine.style.cursor = 'pointer';
             headLine.onclick = function(e) {
-                if (e.target.className !== 'tree-copy-btn') toggle.onclick();
+                if (e.target.className === 'tree-copy-btn') return;
+                doToggle();
             };
 
             container.appendChild(headLine);
