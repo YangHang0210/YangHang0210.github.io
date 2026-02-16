@@ -353,15 +353,45 @@
         }
 
         if (Array.isArray(a)) {
-            const maxLen = Math.max(a.length, b.length);
-            for (let i = 0; i < maxLen; i++) {
-                const childPath = path + '[' + i + ']';
-                if (i >= a.length) {
-                    diffs.push({ type: 'added', path: childPath, newVal: b[i] });
-                } else if (i >= b.length) {
-                    diffs.push({ type: 'removed', path: childPath, oldVal: a[i] });
-                } else {
-                    deepDiff(a[i], b[i], childPath, diffs);
+            // 判断是否为纯基本类型数组（string/number/boolean/null）
+            const isPrimitive = arr => arr.every(v => v === null || typeof v !== 'object');
+            if (isPrimitive(a) && isPrimitive(b)) {
+                // 基于值的对比（集合方式）
+                const setA = a.map(v => JSON.stringify(v));
+                const setB = b.map(v => JSON.stringify(v));
+                const removed = [];
+                const added = [];
+                // 计算差异：支持重复元素
+                const countA = {};
+                const countB = {};
+                setA.forEach(v => { countA[v] = (countA[v] || 0) + 1; });
+                setB.forEach(v => { countB[v] = (countB[v] || 0) + 1; });
+                for (const v of Object.keys(countA)) {
+                    const diff = (countA[v] || 0) - (countB[v] || 0);
+                    for (let i = 0; i < diff; i++) removed.push(JSON.parse(v));
+                }
+                for (const v of Object.keys(countB)) {
+                    const diff = (countB[v] || 0) - (countA[v] || 0);
+                    for (let i = 0; i < diff; i++) added.push(JSON.parse(v));
+                }
+                removed.forEach(v => {
+                    diffs.push({ type: 'removed', path: path + '[]', oldVal: v });
+                });
+                added.forEach(v => {
+                    diffs.push({ type: 'added', path: path + '[]', newVal: v });
+                });
+            } else {
+                // 对象数组：按索引对比
+                const maxLen = Math.max(a.length, b.length);
+                for (let i = 0; i < maxLen; i++) {
+                    const childPath = path + '[' + i + ']';
+                    if (i >= a.length) {
+                        diffs.push({ type: 'added', path: childPath, newVal: b[i] });
+                    } else if (i >= b.length) {
+                        diffs.push({ type: 'removed', path: childPath, oldVal: a[i] });
+                    } else {
+                        deepDiff(a[i], b[i], childPath, diffs);
+                    }
                 }
             }
             return;
