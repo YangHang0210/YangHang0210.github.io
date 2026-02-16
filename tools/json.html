@@ -896,57 +896,93 @@
 
     // ===== 展开/折叠 =====
     function expandAll() {
-        treeEl.querySelectorAll('.tree-children.collapsed').forEach(el => {
-            el.classList.remove('collapsed');
-        });
-        treeEl.querySelectorAll('.tree-toggle').forEach(el => { el.textContent = '▼'; });
-        treeEl.querySelectorAll('.tree-line').forEach(el => { el.style.display = ''; });
+        if (lastValidJSON === null) return;
+        if (currentTab !== 'tree') switchTab('tree');
+        treeEl.innerHTML = '';
+        const root = createTreeNode('root', lastValidJSON, '', 0, Infinity);
+        treeEl.appendChild(root);
+        showToast('已全部展开', 'success');
     }
 
     function collapseAll() {
-        treeEl.querySelectorAll('.tree-children').forEach(el => {
-            el.classList.add('collapsed');
-        });
-        treeEl.querySelectorAll('.tree-toggle').forEach(el => { el.textContent = '▶'; });
+        if (lastValidJSON === null) return;
+        if (currentTab !== 'tree') switchTab('tree');
+        treeEl.innerHTML = '';
+        const root = createTreeNode('root', lastValidJSON, '', 0, 0);
+        treeEl.appendChild(root);
+        showToast('已全部折叠', 'success');
     }
 
     // ===== 搜索 =====
+    let searchTimer = null;
     function toggleSearch() {
-        document.getElementById('searchBox').classList.toggle('show');
-        document.getElementById('searchInput').focus();
+        const box = document.getElementById('searchBox');
+        box.classList.toggle('show');
+        if (box.classList.contains('show')) {
+            document.getElementById('searchInput').focus();
+            if (currentTab !== 'tree' && lastValidJSON !== null) {
+                switchTab('tree');
+            }
+        }
     }
 
     function searchTree() {
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(_doSearch, 80);
+    }
+
+    function _doSearch() {
         const query = document.getElementById('searchInput').value.toLowerCase().trim();
         if (!query) { clearSearch(); return; }
 
+        if (currentTab !== 'tree') {
+            if (lastValidJSON !== null) switchTab('tree');
+            else return;
+        }
+
+        if (!treeEl.children.length && lastValidJSON !== null) {
+            buildTree(lastValidJSON);
+        }
+
+        let matchCount = 0;
         treeEl.querySelectorAll('.tree-line').forEach(line => {
             const text = line.textContent.toLowerCase();
             if (text.includes(query)) {
-                line.style.background = 'rgba(56, 189, 248, 0.12)';
-                // 展开父级
+                line.style.background = 'rgba(56, 189, 248, 0.15)';
+                line.style.borderLeft = '3px solid var(--accent)';
+                matchCount++;
                 let parent = line.parentElement;
                 while (parent && parent !== treeEl) {
-                    if (parent.classList.contains('tree-children')) {
+                    if (parent.classList.contains('tree-children') && parent.classList.contains('collapsed')) {
                         parent.classList.remove('collapsed');
-                        const prevToggle = parent.previousElementSibling;
-                        if (prevToggle) {
-                            const t = prevToggle.querySelector('.tree-toggle');
+                        const headLine = parent.previousElementSibling;
+                        if (headLine) {
+                            const t = headLine.querySelector('.tree-toggle');
                             if (t) t.textContent = '▼';
                         }
+                        const closeLine = parent.nextElementSibling;
+                        if (closeLine) closeLine.style.display = '';
                     }
                     parent = parent.parentElement;
                 }
             } else {
                 line.style.background = '';
+                line.style.borderLeft = '';
             }
         });
+
+        if (matchCount > 0) {
+            const first = treeEl.querySelector('.tree-line[style*="border-left"]');
+            if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        showToast(matchCount > 0 ? '找到 ' + matchCount + ' 处匹配' : '未找到匹配', matchCount > 0 ? 'info' : 'error');
     }
 
     function clearSearch() {
         document.getElementById('searchInput').value = '';
         treeEl.querySelectorAll('.tree-line').forEach(line => {
             line.style.background = '';
+            line.style.borderLeft = '';
         });
     }
 
