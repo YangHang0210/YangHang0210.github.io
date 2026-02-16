@@ -252,7 +252,6 @@
         <button class="btn primary" onclick="runDiff()">对比</button>
         <button class="btn swap" onclick="swapInputs()">交换左右</button>
         <button class="btn" onclick="formatBoth()">格式化两侧</button>
-        <button class="btn" onclick="loadSample()">示例数据</button>
         <button class="btn danger" onclick="clearAll()">清空</button>
     </div>
 
@@ -502,23 +501,6 @@
         diffResult.innerHTML = '';
         diffPanel.classList.remove('show');
         statsBar.innerHTML = '<span>点击"对比"查看差异</span>';
-    }
-
-    function loadSample() {
-        leftEl.value = JSON.stringify({
-            "name": "Alice",
-            "age": 28,
-            "skills": ["Python", "JavaScript"],
-            "address": { "city": "Beijing", "zip": "100000" }
-        }, null, 2);
-        rightEl.value = JSON.stringify({
-            "name": "Alice",
-            "age": 29,
-            "skills": ["Python", "TypeScript", "Go"],
-            "address": { "city": "Shanghai", "zip": "200000" },
-            "email": "alice@example.com"
-        }, null, 2);
-        showToast('已加载示例', 'info');
     }
 
     // 分割线拖拽
