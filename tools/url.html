@@ -284,6 +284,18 @@
         const raw = inputArea.value;
         if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
 
+        // 智能编码：检测 =https:// 或 =http:// 模式，自动编码嵌套的 URL 参数值
+        const nestedIdx = raw.search(/=https?:\/\//);
+        if (nestedIdx !== -1) {
+            const prefix = raw.substring(0, nestedIdx + 1);
+            const value = raw.substring(nestedIdx + 1);
+            const encoded = encodePreservingPlaceholders(value, encodeURIComponent);
+            outputArea.value = prefix + encoded;
+            updateCounts();
+            showToast('编码完成（自动识别嵌套URL参数值）', 'success');
+            return;
+        }
+
         const result = encodePreservingPlaceholders(raw, encodeURI);
         outputArea.value = result;
         updateCounts();
