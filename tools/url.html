@@ -218,6 +218,7 @@
         <!-- 操作栏 -->
         <div class="toolbar">
             <button class="btn primary" onclick="doEncode()">编码</button>
+            <button class="btn" onclick="doEncodeAll()">全编码</button>
             <button class="btn primary" onclick="doEncodeSelection()" title="选中输入框中要编码的部分，点击此按钮">编码选区</button>
             <button class="btn success" onclick="doDecode()">解码</button>
             <div style="flex:1"></div>
@@ -226,8 +227,9 @@
             <button class="btn danger" onclick="clearAll()">清空</button>
         </div>
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;">
-            <b>编码</b>=智能识别嵌套URL参数值并编码&nbsp;&nbsp;
-            <b>编码选区</b>=只编码选中部分（encodeURIComponent）
+            <b>编码</b>=智能识别嵌套URL参数值&nbsp;&nbsp;
+            <b>全编码</b>=无脑编码一切（保留占位符）&nbsp;&nbsp;
+            <b>编码选区</b>=只编码选中部分
         </div>
 
         <!-- 输出 -->
@@ -300,6 +302,16 @@
         outputArea.value = result;
         updateCounts();
         showToast('编码完成', 'success');
+    }
+
+    function doEncodeAll() {
+        const raw = inputArea.value;
+        if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
+
+        const result = encodePreservingPlaceholders(raw, encodeURIComponent);
+        outputArea.value = result;
+        updateCounts();
+        showToast('全编码完成（占位符已保留）', 'success');
     }
 
     function doEncodeSelection() {
