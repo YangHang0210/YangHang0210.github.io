@@ -217,10 +217,10 @@
 
         <!-- 操作栏 -->
         <div class="toolbar">
-            <button class="btn primary" onclick="doEncode()">编码 (Encode)</button>
-            <button class="btn success" onclick="doDecode()">解码 (Decode)</button>
+            <button class="btn primary" onclick="doEncode()">编码</button>
+            <button class="btn success" onclick="doDecode()">解码</button>
+            <button class="btn" onclick="doDeepDecode()">递归解码</button>
             <button class="btn" onclick="doEncodeComponent()">编码组件</button>
-            <button class="btn" onclick="doDecodeComponent()">解码组件</button>
             <div style="flex:1"></div>
             <button class="btn swap" onclick="swapIO()">&#8645; 交换</button>
             <button class="btn" onclick="copyOutput()">复制结果</button>
@@ -334,21 +334,42 @@
         const raw = inputArea.value;
         if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
         try {
-            outputArea.value = decodeURI(raw);
+            outputArea.value = decodeURIComponent(raw);
             updateCounts();
             showToast('解码完成', 'success');
         } catch (e) {
-            showToast('解码失败: ' + e.message, 'error');
+            // decodeURIComponent 失败时回退到 decodeURI
+            try {
+                outputArea.value = decodeURI(raw);
+                updateCounts();
+                showToast('解码完成（部分保留字符未解码）', 'info');
+            } catch (e2) {
+                showToast('解码失败: ' + e2.message, 'error');
+            }
         }
     }
 
-    function doDecodeComponent() {
+    function doDeepDecode() {
         const raw = inputArea.value;
         if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
         try {
-            outputArea.value = decodeURIComponent(raw);
+            let result = raw;
+            let rounds = 0;
+            const maxRounds = 10;
+            while (rounds < maxRounds) {
+                let decoded;
+                try {
+                    decoded = decodeURIComponent(result);
+                } catch {
+                    decoded = decodeURI(result);
+                }
+                if (decoded === result) break;
+                result = decoded;
+                rounds++;
+            }
+            outputArea.value = result;
             updateCounts();
-            showToast('组件解码完成', 'success');
+            showToast('递归解码完成（' + rounds + ' 层）', 'success');
         } catch (e) {
             showToast('解码失败: ' + e.message, 'error');
         }
