@@ -218,13 +218,17 @@
         <!-- 操作栏 -->
         <div class="toolbar">
             <button class="btn primary" onclick="doEncode()">编码</button>
+            <button class="btn primary" onclick="doEncodeSelection()" title="选中输入框中要编码的部分，点击此按钮">编码选区</button>
             <button class="btn success" onclick="doDecode()">解码</button>
             <button class="btn" onclick="doDeepDecode()">递归解码</button>
-            <button class="btn" onclick="doEncodeComponent()">编码组件</button>
             <div style="flex:1"></div>
             <button class="btn swap" onclick="swapIO()">&#8645; 交换</button>
             <button class="btn" onclick="copyOutput()">复制结果</button>
             <button class="btn danger" onclick="clearAll()">清空</button>
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;">
+            <b>编码</b>=encodeURI（保留URL结构）&nbsp;&nbsp;
+            <b>编码选区</b>=选中部分用encodeURIComponent编码（编码一切，适合编码参数值）
         </div>
 
         <!-- 输出 -->
@@ -287,14 +291,22 @@
         showToast('编码完成', 'success');
     }
 
-    function doEncodeComponent() {
-        const raw = inputArea.value;
-        if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
-
-        const result = encodePreservingPlaceholders(raw, encodeURIComponent);
-        outputArea.value = result;
+    function doEncodeSelection() {
+        const start = inputArea.selectionStart;
+        const end = inputArea.selectionEnd;
+        if (start === end) {
+            showToast('请先在输入框中选中要编码的文本', 'error');
+            return;
+        }
+        const full = inputArea.value;
+        const selected = full.substring(start, end);
+        const encoded = encodePreservingPlaceholders(selected, encodeURIComponent);
+        outputArea.value = full.substring(0, start) + encoded + full.substring(end);
         updateCounts();
-        showToast('组件编码完成', 'success');
+
+        // 高亮提示编码了哪部分
+        const encodedLen = encoded.length;
+        showToast('已编码选中的 ' + selected.length + ' 个字符 → ' + encodedLen + ' 个字符', 'success');
     }
 
     function encodePreservingPlaceholders(text, encodeFn) {
