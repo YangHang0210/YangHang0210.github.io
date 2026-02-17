@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL 编解码 - YangHang's Toolbox</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --border: #334155;
+            --border-hover: #475569;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #38bdf8;
+            --success: #34d399;
+            --error: #f87171;
+            --warning: #fbbf24;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            gap: 16px;
+        }
+        .navbar a.back {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: flex; align-items: center; gap: 4px;
+            transition: color 0.2s;
+        }
+        .navbar a.back:hover { color: var(--accent); }
+        .navbar h1 { font-size: 1.1rem; font-weight: 600; }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .btn:hover { border-color: var(--border-hover); background: #3b4f6b; }
+        .btn:active { transform: scale(0.97); }
+        .btn.primary { background: #1d4ed8; border-color: #2563eb; color: #fff; }
+        .btn.primary:hover { background: #2563eb; }
+        .btn.success { background: #065f46; border-color: #059669; color: #6ee7b7; }
+        .btn.success:hover { background: #047857; }
+        .btn.danger { background: #7f1d1d; border-color: #b91c1c; }
+        .btn.danger:hover { background: #991b1b; }
+        .btn.swap { background: #4a1d96; border-color: #6d28d9; color: #c4b5fd; }
+        .btn.swap:hover { background: #5b21b6; }
+
+        .panel-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .panel-label .badge {
+            font-size: 0.72rem;
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .panel-label .badge.chars { background: var(--bg-tertiary); color: var(--text-muted); }
+
+        textarea {
+            width: 100%;
+            min-height: 160px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            padding: 14px 16px;
+            font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        textarea:focus { border-color: var(--accent); }
+        textarea::placeholder { color: var(--text-muted); }
+
+        /* 占位符提示 */
+        .placeholder-bar {
+            display: none;
+            padding: 10px 16px;
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 8px;
+            font-size: 0.82rem;
+            color: var(--warning);
+            line-height: 1.6;
+        }
+        .placeholder-bar.show { display: block; }
+        .placeholder-bar .ph-tag {
+            display: inline-block;
+            background: rgba(251, 191, 36, 0.2);
+            border: 1px solid rgba(251, 191, 36, 0.4);
+            border-radius: 4px;
+            padding: 0 6px;
+            margin: 0 2px;
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            font-weight: 600;
+        }
+
+        /* URL 分析 */
+        .url-parts {
+            display: none;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-size: 0.82rem;
+            line-height: 1.8;
+        }
+        .url-parts.show { display: block; }
+        .url-parts .part-row {
+            display: flex;
+            gap: 8px;
+            align-items: baseline;
+        }
+        .url-parts .part-label {
+            color: var(--text-muted);
+            min-width: 80px;
+            flex-shrink: 0;
+        }
+        .url-parts .part-value {
+            color: var(--accent);
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            word-break: break-all;
+        }
+        .url-parts .param-key { color: var(--success); }
+        .url-parts .param-eq { color: var(--text-muted); }
+        .url-parts .param-val { color: #fbbf24; }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            z-index: 1000;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #065f46; border: 1px solid #059669; color: #6ee7b7; }
+        .toast.error { background: #450a0a; border: 1px solid #b91c1c; color: #fca5a5; }
+        .toast.info { background: #1e3a5f; border: 1px solid #2563eb; color: #93c5fd; }
+
+        @media (max-width: 600px) {
+            .container { padding: 12px; }
+            textarea { min-height: 120px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="../index.html" class="back">&larr; 返回</a>
+        <h1>URL 编解码</h1>
+    </nav>
+
+    <div class="container">
+        <!-- 输入 -->
+        <div>
+            <div class="panel-label">
+                输入
+                <span class="badge chars" id="inputCount">0 字符</span>
+            </div>
+            <textarea id="inputArea"
+                placeholder="粘贴 URL 或文本...&#10;&#10;例如: https://example.com/search?q=你好&page=1"
+                oninput="onInput()"></textarea>
+        </div>
+
+        <!-- 占位符提示 -->
+        <div class="placeholder-bar" id="phBar"></div>
+
+        <!-- 操作栏 -->
+        <div class="toolbar">
+            <button class="btn primary" onclick="doEncode()">编码 (Encode)</button>
+            <button class="btn success" onclick="doDecode()">解码 (Decode)</button>
+            <button class="btn" onclick="doEncodeComponent()">编码组件</button>
+            <button class="btn" onclick="doDecodeComponent()">解码组件</button>
+            <div style="flex:1"></div>
+            <button class="btn swap" onclick="swapIO()">&#8645; 交换</button>
+            <button class="btn" onclick="copyOutput()">复制结果</button>
+            <button class="btn danger" onclick="clearAll()">清空</button>
+        </div>
+
+        <!-- 输出 -->
+        <div>
+            <div class="panel-label">
+                输出
+                <span class="badge chars" id="outputCount">0 字符</span>
+            </div>
+            <textarea id="outputArea" readonly placeholder="结果显示在这里..."></textarea>
+        </div>
+
+        <!-- URL 解析 -->
+        <div class="url-parts" id="urlParts"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    const inputArea = document.getElementById('inputArea');
+    const outputArea = document.getElementById('outputArea');
+    const phBar = document.getElementById('phBar');
+    const urlParts = document.getElementById('urlParts');
+
+    // 匹配占位符: {0}, {1}, {name}, {userId} 等
+    const PH_REGEX = /\{(\d+|[a-zA-Z_]\w*)\}/g;
+
+    function onInput() {
+        updateCounts();
+        detectPlaceholders();
+        parseUrl();
+    }
+
+    function updateCounts() {
+        document.getElementById('inputCount').textContent = inputArea.value.length + ' 字符';
+        document.getElementById('outputCount').textContent = outputArea.value.length + ' 字符';
+    }
+
+    // ===== 占位符检测 =====
+    function detectPlaceholders() {
+        const text = inputArea.value;
+        const matches = [...text.matchAll(PH_REGEX)];
+        if (matches.length === 0) {
+            phBar.classList.remove('show');
+            return;
+        }
+        const unique = [...new Set(matches.map(m => m[0]))];
+        const tags = unique.map(p => '<span class="ph-tag">' + escapeHtml(p) + '</span>').join(' ');
+        phBar.innerHTML = '&#9888; 检测到占位符：' + tags + '<br>编码时将自动保留这些占位符不被编码';
+        phBar.classList.add('show');
+    }
+
+    // ===== 编码（保留占位符）=====
+    function doEncode() {
+        const raw = inputArea.value;
+        if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
+
+        const result = encodePreservingPlaceholders(raw, encodeURI);
+        outputArea.value = result;
+        updateCounts();
+        showToast('编码完成', 'success');
+    }
+
+    function doEncodeComponent() {
+        const raw = inputArea.value;
+        if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
+
+        const result = encodePreservingPlaceholders(raw, encodeURIComponent);
+        outputArea.value = result;
+        updateCounts();
+        showToast('组件编码完成', 'success');
+    }
+
+    function encodePreservingPlaceholders(text, encodeFn) {
+        // 1. 找到所有占位符及其位置
+        const placeholders = [];
+        let match;
+        const regex = new RegExp(PH_REGEX.source, 'g');
+        while ((match = regex.exec(text)) !== null) {
+            placeholders.push({ start: match.index, end: match.index + match[0].length, text: match[0] });
+        }
+
+        if (placeholders.length === 0) {
+            return encodeFn(text);
+        }
+
+        // 2. 将文本拆分为 [普通段, 占位符, 普通段, ...]
+        let result = '';
+        let lastEnd = 0;
+        for (const ph of placeholders) {
+            // 编码占位符前的普通文本
+            if (ph.start > lastEnd) {
+                result += encodeFn(text.substring(lastEnd, ph.start));
+            }
+            // 保留占位符原样
+            result += ph.text;
+            lastEnd = ph.end;
+        }
+        // 编码最后一段
+        if (lastEnd < text.length) {
+            result += encodeFn(text.substring(lastEnd));
+        }
+        return result;
+    }
+
+    // ===== 解码 =====
+    function doDecode() {
+        const raw = inputArea.value;
+        if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
+        try {
+            outputArea.value = decodeURI(raw);
+            updateCounts();
+            showToast('解码完成', 'success');
+        } catch (e) {
+            showToast('解码失败: ' + e.message, 'error');
+        }
+    }
+
+    function doDecodeComponent() {
+        const raw = inputArea.value;
+        if (!raw.trim()) { showToast('请输入内容', 'info'); return; }
+        try {
+            outputArea.value = decodeURIComponent(raw);
+            updateCounts();
+            showToast('组件解码完成', 'success');
+        } catch (e) {
+            showToast('解码失败: ' + e.message, 'error');
+        }
+    }
+
+    // ===== URL 解析 =====
+    function parseUrl() {
+        const raw = inputArea.value.trim();
+
+        if (!raw || !looksLikeUrl(raw)) {
+            urlParts.classList.remove('show');
+            return;
+        }
+
+        try {
+            // 先尝试解码再解析，也尝试直接解析
+            let urlStr = raw;
+            try { urlStr = decodeURI(raw); } catch {}
+
+            const url = new URL(urlStr);
+            let html = '';
+
+            html += mkPart('协议', url.protocol);
+            if (url.hostname) html += mkPart('主机', url.hostname);
+            if (url.port) html += mkPart('端口', url.port);
+            if (url.pathname && url.pathname !== '/') html += mkPart('路径', url.pathname);
+            if (url.hash) html += mkPart('Hash', url.hash);
+
+            // 参数解析
+            const params = url.searchParams;
+            const paramEntries = [...params.entries()];
+            if (paramEntries.length > 0) {
+                html += '<div style="margin-top:6px;color:var(--text-secondary);font-weight:600;">查询参数 (' + paramEntries.length + ')</div>';
+                for (const [k, v] of paramEntries) {
+                    html += '<div class="part-row" style="margin-left:12px;">' +
+                        '<span class="param-key">' + escapeHtml(k) + '</span>' +
+                        '<span class="param-eq">=</span>' +
+                        '<span class="param-val">' + escapeHtml(v) + '</span>' +
+                        '</div>';
+                }
+            }
+
+            urlParts.innerHTML = html;
+            urlParts.classList.add('show');
+        } catch {
+            urlParts.classList.remove('show');
+        }
+    }
+
+    function looksLikeUrl(s) {
+        return /^https?:\/\//i.test(s) || /^https?%3A%2F%2F/i.test(s);
+    }
+
+    function mkPart(label, value) {
+        return '<div class="part-row">' +
+            '<span class="part-label">' + label + '</span>' +
+            '<span class="part-value">' + escapeHtml(value) + '</span>' +
+            '</div>';
+    }
+
+    // ===== 其他操作 =====
+    function swapIO() {
+        const tmp = inputArea.value;
+        inputArea.value = outputArea.value;
+        outputArea.value = tmp;
+        onInput();
+        showToast('已交换', 'success');
+    }
+
+    function copyOutput() {
+        const text = outputArea.value;
+        if (!text) { showToast('没有可复制的内容', 'info'); return; }
+        navigator.clipboard.writeText(text)
+            .then(() => showToast('已复制', 'success'))
+            .catch(() => {
+                outputArea.select();
+                document.execCommand('copy');
+                showToast('已复制', 'success');
+            });
+    }
+
+    function clearAll() {
+        inputArea.value = '';
+        outputArea.value = '';
+        phBar.classList.remove('show');
+        urlParts.classList.remove('show');
+        updateCounts();
+    }
+
+    // ===== 工具 =====
+    function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast ' + type + ' show';
+        setTimeout(() => t.classList.remove('show'), 1800);
+    }
+
+    // 粘贴自动检测
+    inputArea.addEventListener('paste', () => {
+        setTimeout(onInput, 50);
+    });
+    </script>
+</body>
+</html>
