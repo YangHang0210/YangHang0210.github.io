@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时间工具 - YangHang's Toolbox</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --border: #334155;
+            --border-hover: #475569;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #38bdf8;
+            --accent-purple: #818cf8;
+            --success: #34d399;
+            --error: #f87171;
+            --warning: #fbbf24;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            gap: 16px;
+        }
+        .navbar a.back {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+        .navbar a.back:hover { color: var(--accent); }
+        .navbar h1 { font-size: 1.1rem; font-weight: 600; }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card-header .icon { font-size: 1.2rem; }
+        .card-body { padding: 20px; }
+
+        /* 当前时间 */
+        .now-display {
+            text-align: center;
+            padding: 20px;
+        }
+        .now-time {
+            font-size: 2.2rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        .now-date {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        .now-stamps {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .stamp-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .stamp-chip:hover { border-color: var(--accent); }
+        .stamp-chip .label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        /* 时间戳转换 */
+        .ts-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .ts-field { flex: 1; min-width: 200px; }
+        .ts-field label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .ts-field input, .ts-field select {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .ts-field input:focus, .ts-field select:focus { border-color: var(--accent); }
+        .ts-field input::placeholder { color: var(--text-muted); }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .btn:hover { border-color: var(--border-hover); background: #3b4f6b; }
+        .btn:active { transform: scale(0.97); }
+        .btn.primary { background: #1d4ed8; border-color: #2563eb; color: #fff; }
+        .btn.primary:hover { background: #2563eb; }
+
+        .result-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 18px;
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            min-height: 40px;
+        }
+        .result-box .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .result-box .label { color: var(--text-muted); font-size: 0.82rem; }
+        .result-box .value { color: var(--accent); }
+        .result-box .copy-btn {
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+        .result-box .copy-btn:hover { color: var(--accent); background: var(--bg-tertiary); }
+
+        .arrow-divider {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            padding: 8px 0;
+        }
+
+        /* 时长转换 */
+        .duration-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        .dur-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .dur-item label {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+        .dur-item input {
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .dur-item input:focus { border-color: var(--accent); }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            z-index: 1000;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #065f46; border: 1px solid #059669; color: #6ee7b7; }
+        .toast.info { background: #1e3a5f; border: 1px solid #2563eb; color: #93c5fd; }
+
+        @media (max-width: 600px) {
+            .container { padding: 12px; }
+            .now-time { font-size: 1.6rem; }
+            .duration-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="../index.html" class="back">&larr; 返回</a>
+        <h1>时间工具</h1>
+    </nav>
+
+    <div class="container">
+        <!-- 当前时间 -->
+        <div class="card">
+            <div class="card-header"><span class="icon">&#128339;</span> 当前时间</div>
+            <div class="card-body now-display">
+                <div class="now-time" id="nowTime">--:--:--</div>
+                <div class="now-date" id="nowDate">----年--月--日 星期-</div>
+                <div class="now-stamps">
+                    <div class="stamp-chip" onclick="copyText(document.getElementById('nowSec').textContent)" title="点击复制">
+                        <span class="label">秒</span>
+                        <span id="nowSec">-</span>
+                    </div>
+                    <div class="stamp-chip" onclick="copyText(document.getElementById('nowMs').textContent)" title="点击复制">
+                        <span class="label">毫秒</span>
+                        <span id="nowMs">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 时间戳 → 日期 -->
+        <div class="card">
+            <div class="card-header"><span class="icon">&#128197;</span> 时间戳 → 日期时间</div>
+            <div class="card-body">
+                <div class="ts-row">
+                    <div class="ts-field">
+                        <label>输入时间戳</label>
+                        <input type="text" id="tsInput" placeholder="如 1739347200 或 1739347200000" oninput="tsToDate()">
+                    </div>
+                    <div class="ts-field" style="max-width:120px">
+                        <label>单位</label>
+                        <select id="tsUnit" onchange="tsToDate()">
+                            <option value="auto">自动</option>
+                            <option value="s">秒</option>
+                            <option value="ms">毫秒</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="document.getElementById('tsInput').value=Math.floor(Date.now()/1000);tsToDate()">填入当前</button>
+                </div>
+                <div class="result-box" id="tsResult">
+                    <span style="color:var(--text-muted)">输入时间戳后自动转换</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日期 → 时间戳 -->
+        <div class="card">
+            <div class="card-header"><span class="icon">&#9201;</span> 日期时间 → 时间戳</div>
+            <div class="card-body">
+                <div class="ts-row">
+                    <div class="ts-field">
+                        <label>日期时间</label>
+                        <input type="datetime-local" id="dtInput" step="1" onchange="dateToTs()">
+                    </div>
+                    <button class="btn" onclick="fillNow()">填入当前</button>
+                </div>
+                <div class="result-box" id="dtResult">
+                    <span style="color:var(--text-muted)">选择日期后自动转换</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 时长转换 -->
+        <div class="card">
+            <div class="card-header"><span class="icon">&#8644;</span> 时长互转</div>
+            <div class="card-body">
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:14px;">输入任意一项，其余自动换算</p>
+                <div class="duration-grid">
+                    <div class="dur-item">
+                        <label>天</label>
+                        <input type="number" id="durDays" step="any" oninput="durConvert('days')">
+                    </div>
+                    <div class="dur-item">
+                        <label>小时</label>
+                        <input type="number" id="durHours" step="any" oninput="durConvert('hours')">
+                    </div>
+                    <div class="dur-item">
+                        <label>分钟</label>
+                        <input type="number" id="durMinutes" step="any" oninput="durConvert('minutes')">
+                    </div>
+                    <div class="dur-item">
+                        <label>秒</label>
+                        <input type="number" id="durSeconds" step="any" oninput="durConvert('seconds')">
+                    </div>
+                    <div class="dur-item">
+                        <label>毫秒</label>
+                        <input type="number" id="durMs" step="any" oninput="durConvert('ms')">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // ===== 当前时间 =====
+    const weekNames = ['日', '一', '二', '三', '四', '五', '六'];
+
+    function updateNow() {
+        const now = new Date();
+        document.getElementById('nowTime').textContent =
+            pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
+        document.getElementById('nowDate').textContent =
+            now.getFullYear() + '年' + pad2(now.getMonth() + 1) + '月' + pad2(now.getDate()) + '日 星期' + weekNames[now.getDay()];
+        document.getElementById('nowSec').textContent = Math.floor(now.getTime() / 1000);
+        document.getElementById('nowMs').textContent = now.getTime();
+    }
+
+    function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+    setInterval(updateNow, 1000);
+    updateNow();
+
+    // ===== 时间戳 → 日期 =====
+    function tsToDate() {
+        const raw = document.getElementById('tsInput').value.trim();
+        const box = document.getElementById('tsResult');
+        if (!raw) {
+            box.innerHTML = '<span style="color:var(--text-muted)">输入时间戳后自动转换</span>';
+            return;
+        }
+
+        const num = Number(raw);
+        if (isNaN(num)) {
+            box.innerHTML = '<span style="color:var(--error)">无效数字</span>';
+            return;
+        }
+
+        const unit = document.getElementById('tsUnit').value;
+        let ms;
+        let detectedUnit;
+        if (unit === 'auto') {
+            if (raw.length >= 13) {
+                ms = num;
+                detectedUnit = '毫秒';
+            } else {
+                ms = num * 1000;
+                detectedUnit = '秒';
+            }
+        } else if (unit === 'ms') {
+            ms = num;
+            detectedUnit = '毫秒';
+        } else {
+            ms = num * 1000;
+            detectedUnit = '秒';
+        }
+
+        const d = new Date(ms);
+        if (isNaN(d.getTime())) {
+            box.innerHTML = '<span style="color:var(--error)">无效时间戳</span>';
+            return;
+        }
+
+        const localStr = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+            ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+        const utcStr = d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
+        const isoStr = d.toISOString();
+        const relStr = getRelativeTime(d);
+
+        box.innerHTML =
+            mkRow('本地时间', localStr) +
+            mkRow('UTC', utcStr) +
+            mkRow('ISO 8601', isoStr) +
+            mkRow('相对时间', relStr) +
+            mkRow('识别单位', detectedUnit);
+    }
+
+    function getRelativeTime(d) {
+        const now = Date.now();
+        const diff = now - d.getTime();
+        const abs = Math.abs(diff);
+        const suffix = diff > 0 ? '前' : '后';
+
+        if (abs < 60000) return Math.floor(abs / 1000) + ' 秒' + suffix;
+        if (abs < 3600000) return Math.floor(abs / 60000) + ' 分钟' + suffix;
+        if (abs < 86400000) return Math.floor(abs / 3600000) + ' 小时' + suffix;
+        if (abs < 2592000000) return Math.floor(abs / 86400000) + ' 天' + suffix;
+        if (abs < 31536000000) return Math.floor(abs / 2592000000) + ' 个月' + suffix;
+        return Math.floor(abs / 31536000000) + ' 年' + suffix;
+    }
+
+    // ===== 日期 → 时间戳 =====
+    function fillNow() {
+        const now = new Date();
+        const local = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) +
+            'T' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
+        document.getElementById('dtInput').value = local;
+        dateToTs();
+    }
+
+    function dateToTs() {
+        const val = document.getElementById('dtInput').value;
+        const box = document.getElementById('dtResult');
+        if (!val) {
+            box.innerHTML = '<span style="color:var(--text-muted)">选择日期后自动转换</span>';
+            return;
+        }
+
+        const d = new Date(val);
+        if (isNaN(d.getTime())) {
+            box.innerHTML = '<span style="color:var(--error)">无效日期</span>';
+            return;
+        }
+
+        const sec = Math.floor(d.getTime() / 1000);
+        const msVal = d.getTime();
+
+        box.innerHTML =
+            mkRow('秒级时间戳', sec) +
+            mkRow('毫秒级时间戳', msVal) +
+            mkRow('ISO 8601', d.toISOString());
+    }
+
+    // ===== 时长互转 =====
+    const durFields = {
+        days: { el: () => document.getElementById('durDays'), toMs: 86400000 },
+        hours: { el: () => document.getElementById('durHours'), toMs: 3600000 },
+        minutes: { el: () => document.getElementById('durMinutes'), toMs: 60000 },
+        seconds: { el: () => document.getElementById('durSeconds'), toMs: 1000 },
+        ms: { el: () => document.getElementById('durMs'), toMs: 1 },
+    };
+
+    function durConvert(source) {
+        const srcEl = durFields[source].el();
+        const val = parseFloat(srcEl.value);
+        if (isNaN(val)) {
+            for (const key of Object.keys(durFields)) {
+                if (key !== source) durFields[key].el().value = '';
+            }
+            return;
+        }
+
+        const totalMs = val * durFields[source].toMs;
+        for (const key of Object.keys(durFields)) {
+            if (key !== source) {
+                const result = totalMs / durFields[key].toMs;
+                durFields[key].el().value = formatNum(result);
+            }
+        }
+    }
+
+    function formatNum(n) {
+        if (Number.isInteger(n)) return n;
+        const s = n.toPrecision(12);
+        return parseFloat(s);
+    }
+
+    // ===== 工具函数 =====
+    function mkRow(label, value) {
+        return '<div class="row">' +
+            '<span><span class="label">' + label + '：</span><span class="value">' + escapeHtml(String(value)) + '</span></span>' +
+            '<span class="copy-btn" onclick="copyText(\'' + escapeJs(String(value)) + '\')">复制</span>' +
+            '</div>';
+    }
+
+    function escapeHtml(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function escapeJs(s) {
+        return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function copyText(text) {
+        navigator.clipboard.writeText(text).then(() => showToast('已复制', 'success'))
+            .catch(() => showToast('复制失败', 'info'));
+    }
+
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast ' + type + ' show';
+        setTimeout(() => t.classList.remove('show'), 1500);
+    }
+    </script>
+</body>
+</html>
