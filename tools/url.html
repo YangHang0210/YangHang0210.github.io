@@ -60,7 +60,7 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
-            align-items: center;
+            align-items: flex-start;
         }
         .btn {
             padding: 8px 18px;
@@ -83,6 +83,18 @@
         .btn.danger:hover { background: #991b1b; }
         .btn.swap { background: #4a1d96; border-color: #6d28d9; color: #c4b5fd; }
         .btn.swap:hover { background: #5b21b6; }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
 
         .panel-label {
             font-size: 0.85rem;
@@ -217,19 +229,26 @@
 
         <!-- 操作栏 -->
         <div class="toolbar">
-            <button class="btn primary" onclick="doEncode()">编码</button>
-            <button class="btn" onclick="doEncodeAll()">全编码</button>
-            <button class="btn primary" onclick="doEncodeSelection()" title="选中输入框中要编码的部分，点击此按钮">编码选区</button>
-            <button class="btn success" onclick="doDecode()">解码</button>
+            <div class="btn-group">
+                <button class="btn primary" onclick="doEncode()">编码</button>
+                <span class="btn-hint">智能识别嵌套URL参数值</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn" onclick="doEncodeAll()">全编码</button>
+                <span class="btn-hint">无脑编码一切（保留占位符）</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn primary" onclick="doEncodeSelection()" title="选中输入框中要编码的部分，点击此按钮">编码选区</button>
+                <span class="btn-hint">只编码选中部分</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn success" onclick="doDecode()">解码</button>
+                <span class="btn-hint">自动递归解码</span>
+            </div>
             <div style="flex:1"></div>
             <button class="btn swap" onclick="swapIO()">&#8645; 交换</button>
             <button class="btn" onclick="copyOutput()">复制结果</button>
             <button class="btn danger" onclick="clearAll()">清空</button>
-        </div>
-        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;">
-            <b>编码</b>=智能识别嵌套URL参数值&nbsp;&nbsp;
-            <b>全编码</b>=无脑编码一切（保留占位符）&nbsp;&nbsp;
-            <b>编码选区</b>=只编码选中部分
         </div>
 
         <!-- 输出 -->
