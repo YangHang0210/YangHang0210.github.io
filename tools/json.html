@@ -356,124 +356,6 @@
             }
             .toolbar { padding: 8px 12px; }
         }
-        /* Code View */
-        .code-view {
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background: var(--bg-primary);
-            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            display: none;
-        }
-        .code-view.active { display: block; }
-        .code-view .cv-line {
-            display: flex;
-            min-height: 1.6em;
-        }
-        .cv-gutter {
-            min-width: 48px;
-            padding: 0 8px 0 12px;
-            text-align: right;
-            color: var(--text-muted);
-            user-select: none;
-            flex-shrink: 0;
-            font-size: 0.85em;
-        }
-        .cv-content {
-            flex: 1;
-            white-space: pre;
-            padding-right: 16px;
-        }
-        .cv-add { background: rgba(34, 197, 94, 0.12); }
-        .cv-add .cv-gutter { color: var(--success); }
-        .cv-remove {
-            background: rgba(248, 113, 113, 0.12);
-            text-decoration: line-through;
-            opacity: 0.7;
-        }
-        .cv-remove .cv-gutter { color: var(--error); }
-        .cv-change { background: rgba(251, 191, 36, 0.08); }
-        .cv-change .cv-gutter { color: var(--warning); }
-
-        /* Diff View (side-by-side) */
-        .diff-view {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            display: none;
-            flex-direction: row;
-        }
-        .diff-view.active { display: flex; }
-        .dv-side {
-            flex: 1;
-            overflow: auto;
-            background: var(--bg-primary);
-            font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            min-width: 0;
-        }
-        .dv-header {
-            position: sticky;
-            top: 0;
-            background: var(--bg-secondary);
-            padding: 6px 16px;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            font-weight: 600;
-            border-bottom: 1px solid var(--border);
-            z-index: 1;
-        }
-        .dv-divider {
-            width: 2px;
-            background: var(--border);
-            flex-shrink: 0;
-        }
-        .dv-side .cv-line {
-            display: flex;
-            min-height: 1.6em;
-        }
-        .dv-side .cv-gutter {
-            min-width: 40px;
-            padding: 0 6px 0 8px;
-            text-align: right;
-            color: var(--text-muted);
-            user-select: none;
-            flex-shrink: 0;
-            font-size: 0.85em;
-        }
-        .dv-side .cv-content {
-            flex: 1;
-            white-space: pre;
-        }
-        .dv-side .cv-add { background: rgba(34, 197, 94, 0.12); }
-        .dv-side .cv-remove { background: rgba(248, 113, 113, 0.12); }
-        .dv-side .cv-empty { background: rgba(100, 116, 139, 0.05); }
-        .dv-empty-hint {
-            padding: 40px 24px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            line-height: 1.8;
-        }
-
-        /* Snapshot badge */
-        .snapshot-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 1px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .snapshot-badge.has { background: rgba(52, 211, 153, 0.15); color: var(--success); }
-        .snapshot-badge.none { background: var(--bg-tertiary); color: var(--text-muted); }
-        .snapshot-badge:hover { opacity: 0.8; }
-
     </style>
 </head>
 <body>
@@ -512,11 +394,6 @@
                 <option value="tab">Tab</option>
             </select>
         </div>
-        <div class="toolbar-divider"></div>
-        <div class="toolbar-group">
-            <button class="btn success" onclick="saveSnapshot()" title="保存当前JSON为基线快照">快照</button>
-            <button class="btn" onclick="clearSnapshot()" title="清除基线快照">清除快照</button>
-        </div>
     </div>
 
     <!-- 状态栏 -->
@@ -528,9 +405,6 @@
         <div class="status-item" id="sizeInfo">大小: 0 B</div>
         <div class="status-item" id="lineInfo">行数: 0</div>
         <div class="status-item" id="depthInfo" style="display:none">深度: 0</div>
-        <div class="status-item">
-            <span class="snapshot-badge none" id="snapshotBadge" onclick="saveSnapshot()" title="点击保存快照">无快照</span>
-        </div>
     </div>
 
     <!-- 错误栏 -->
@@ -560,7 +434,6 @@
             <div class="panel-header">
                 <div style="display:flex;gap:4px;">
                     <span class="tab active" id="tabCode" onclick="switchTab('code')">代码</span>
-                    <span class="tab" id="tabDiff" onclick="switchTab('diff')">差异</span>
                     <span class="tab" id="tabTree" onclick="switchTab('tree')">树形</span>
                 </div>
                 <div style="display:flex;gap:6px;align-items:center">
@@ -575,9 +448,9 @@
                     <input type="text" placeholder="搜索键名或值..." id="searchInput" oninput="searchTree()">
                     <button onclick="clearSearch()">&#x2715;</button>
                 </div>
-                <textarea class="editor" id="outputEditor" readonly style="display:none"></textarea>
-                <div class="code-view active" id="codeView"></div>
-                <div class="diff-view" id="diffView"></div>
+                <textarea class="editor" id="outputEditor" readonly
+                    placeholder="格式化结果将显示在这里..."
+                    spellcheck="false"></textarea>
                 <div class="tree-view" id="treeView"></div>
             </div>
         </div>
@@ -601,9 +474,6 @@
 
     let currentTab = 'code';
     let lastValidJSON = null;
-    let baselineJSON = null;
-    let baselineText = null;
-    let baselineTime = null;
 
     function getIndent() {
         const v = document.getElementById('indentSize').value;
@@ -718,7 +588,6 @@
             treeEl.innerHTML = '';
             depthInfo.style.display = 'none';
             lastValidJSON = null;
-            refreshOutputViews();
             return;
         }
 
@@ -731,15 +600,7 @@
             depthInfo.style.display = '';
             depthInfo.textContent = '深度: ' + depth;
             outputEl.value = JSON.stringify(data, null, getIndent());
-
-            if (!baselineJSON) {
-                baselineJSON = data;
-                baselineText = outputEl.value;
-                baselineTime = new Date();
-                updateSnapshotBadge();
-            }
-
-            refreshOutputViews();
+            if (currentTab === 'tree') buildTree(data);
         } else {
             updateStatus('invalid', 'JSON 无效');
             showError(error);
@@ -761,8 +622,7 @@
         hideError();
         outputEl.value = JSON.stringify(data, null, getIndent());
         lastValidJSON = data;
-        if (baselineJSON) baselineText = JSON.stringify(baselineJSON, null, getIndent());
-        refreshOutputViews();
+        if (currentTab === 'tree') buildTree(data);
         updateStatus('valid', 'JSON 有效');
         showToast('格式化完成', 'success');
     }
@@ -774,7 +634,6 @@
             return;
         }
         outputEl.value = JSON.stringify(data);
-        refreshOutputViews();
         showToast('压缩完成', 'success');
     }
 
@@ -808,7 +667,7 @@
         outputEl.value = JSON.stringify(sorted, null, getIndent());
         inputEl.value = outputEl.value;
         lastValidJSON = sorted;
-        refreshOutputViews();
+        if (currentTab === 'tree') buildTree(sorted);
         showToast('键已按字母排序', 'success');
     }
 
@@ -858,11 +717,6 @@
         updateSize('');
         depthInfo.style.display = 'none';
         lastValidJSON = null;
-        baselineJSON = null;
-        baselineText = null;
-        baselineTime = null;
-        updateSnapshotBadge();
-        refreshOutputViews();
     }
 
     // ===== Tab 切换 =====
@@ -870,22 +724,13 @@
     function switchTab(tab) {
         currentTab = tab;
         document.getElementById('tabCode').className = 'tab' + (tab === 'code' ? ' active' : '');
-        document.getElementById('tabDiff').className = 'tab' + (tab === 'diff' ? ' active' : '');
         document.getElementById('tabTree').className = 'tab' + (tab === 'tree' ? ' active' : '');
 
-        const codeView = document.getElementById('codeView');
-        const diffView = document.getElementById('diffView');
-        codeView.classList.remove('active');
-        diffView.classList.remove('active');
-        treeEl.classList.remove('active');
-
         if (tab === 'code') {
-            codeView.classList.add('active');
-            renderCodeView();
-        } else if (tab === 'diff') {
-            diffView.classList.add('active');
-            renderDiffView();
+            outputEl.style.display = '';
+            treeEl.classList.remove('active');
         } else {
+            outputEl.style.display = 'none';
             treeEl.classList.add('active');
             if (lastValidJSON !== null) buildTree(lastValidJSON);
         }
@@ -1272,212 +1117,6 @@
             inputEl.selectionStart = inputEl.selectionEnd = start + indent.length;
         }
     });
-
-    // ===== 快照 =====
-
-    function saveSnapshot() {
-        const { ok, data } = parseInput();
-        if (!ok || !data) {
-            showToast('请先输入有效的 JSON', 'error');
-            return;
-        }
-        baselineJSON = data;
-        baselineText = JSON.stringify(data, null, getIndent());
-        baselineTime = new Date();
-        updateSnapshotBadge();
-        refreshOutputViews();
-        showToast('快照已保存', 'success');
-    }
-
-    function clearSnapshot() {
-        baselineJSON = null;
-        baselineText = null;
-        baselineTime = null;
-        updateSnapshotBadge();
-        refreshOutputViews();
-        showToast('快照已清除', 'info');
-    }
-
-    function updateSnapshotBadge() {
-        const badge = document.getElementById('snapshotBadge');
-        if (baselineText) {
-            badge.className = 'snapshot-badge has';
-            badge.textContent = '快照 ' + baselineTime.toLocaleTimeString();
-            badge.title = '点击更新快照';
-        } else {
-            badge.className = 'snapshot-badge none';
-            badge.textContent = '无快照';
-            badge.title = '点击保存快照';
-        }
-    }
-
-    function refreshOutputViews() {
-        if (currentTab === 'code') renderCodeView();
-        else if (currentTab === 'diff') renderDiffView();
-    }
-
-    // ===== Diff 算法 (LCS) =====
-
-    function computeLineDiff(oldLines, newLines) {
-        const m = oldLines.length, n = newLines.length;
-        if (m * n > 10000000) return simpleDiff(oldLines, newLines);
-
-        const dp = [];
-        for (let i = 0; i <= m; i++) dp[i] = new Uint32Array(n + 1);
-        for (let i = 1; i <= m; i++) {
-            for (let j = 1; j <= n; j++) {
-                dp[i][j] = oldLines[i - 1] === newLines[j - 1]
-                    ? dp[i - 1][j - 1] + 1
-                    : Math.max(dp[i - 1][j], dp[i][j - 1]);
-            }
-        }
-
-        const ops = [];
-        let i = m, j = n;
-        while (i > 0 || j > 0) {
-            if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
-                ops.push({ type: 'same', oldLine: oldLines[i - 1], newLine: newLines[j - 1] });
-                i--; j--;
-            } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-                ops.push({ type: 'add', oldLine: null, newLine: newLines[j - 1] });
-                j--;
-            } else {
-                ops.push({ type: 'remove', oldLine: oldLines[i - 1], newLine: null });
-                i--;
-            }
-        }
-        return ops.reverse();
-    }
-
-    function simpleDiff(oldLines, newLines) {
-        const result = [];
-        const maxLen = Math.max(oldLines.length, newLines.length);
-        for (let i = 0; i < maxLen; i++) {
-            if (i < oldLines.length && i < newLines.length) {
-                if (oldLines[i] === newLines[i]) {
-                    result.push({ type: 'same', oldLine: oldLines[i], newLine: newLines[i] });
-                } else {
-                    result.push({ type: 'remove', oldLine: oldLines[i], newLine: null });
-                    result.push({ type: 'add', oldLine: null, newLine: newLines[i] });
-                }
-            } else if (i < oldLines.length) {
-                result.push({ type: 'remove', oldLine: oldLines[i], newLine: null });
-            } else {
-                result.push({ type: 'add', oldLine: null, newLine: newLines[i] });
-            }
-        }
-        return result;
-    }
-
-    // ===== Code View 渲染 =====
-
-    function renderCodeView() {
-        const cv = document.getElementById('codeView');
-        const text = outputEl.value;
-
-        if (!text) {
-            cv.innerHTML = '<div class="dv-empty-hint">格式化结果将显示在这里...</div>';
-            return;
-        }
-
-        const newLines = text.split('\n');
-
-        if (!baselineText) {
-            let html = '';
-            for (let i = 0; i < newLines.length; i++) {
-                html += '<div class="cv-line"><span class="cv-gutter">' + (i + 1) +
-                    '</span><span class="cv-content">' + escapeHtml(newLines[i]) + '</span></div>';
-            }
-            cv.innerHTML = html;
-            return;
-        }
-
-        const oldLines = baselineText.split('\n');
-        const diff = computeLineDiff(oldLines, newLines);
-        let html = '';
-        let lineNum = 0;
-
-        for (const op of diff) {
-            if (op.type === 'same') {
-                lineNum++;
-                html += '<div class="cv-line"><span class="cv-gutter">' + lineNum +
-                    '</span><span class="cv-content">' + escapeHtml(op.newLine) + '</span></div>';
-            } else if (op.type === 'add') {
-                lineNum++;
-                html += '<div class="cv-line cv-add"><span class="cv-gutter">+ ' + lineNum +
-                    '</span><span class="cv-content">' + escapeHtml(op.newLine) + '</span></div>';
-            } else if (op.type === 'remove') {
-                html += '<div class="cv-line cv-remove"><span class="cv-gutter">-</span>' +
-                    '<span class="cv-content">' + escapeHtml(op.oldLine) + '</span></div>';
-            }
-        }
-        cv.innerHTML = html;
-    }
-
-    // ===== Diff View 渲染 (side-by-side) =====
-
-    function renderDiffView() {
-        const dv = document.getElementById('diffView');
-
-        if (!baselineText) {
-            dv.innerHTML = '<div class="dv-empty-hint">暂无快照基线<br><br>' +
-                '请先点击工具栏「快照」按钮保存当前 JSON 为基线，<br>编辑后即可在此查看差异对比。</div>';
-            return;
-        }
-
-        const currentText = outputEl.value || '';
-        if (!currentText) {
-            dv.innerHTML = '<div class="dv-empty-hint">请输入有效 JSON</div>';
-            return;
-        }
-
-        const oldLines = baselineText.split('\n');
-        const newLines = currentText.split('\n');
-        const diff = computeLineDiff(oldLines, newLines);
-
-        if (diff.every(op => op.type === 'same')) {
-            dv.innerHTML = '<div class="dv-empty-hint">当前内容与快照基线一致，无差异</div>';
-            return;
-        }
-
-        let leftHtml = '', rightHtml = '';
-        let lNum = 0, rNum = 0;
-
-        for (const op of diff) {
-            if (op.type === 'same') {
-                lNum++; rNum++;
-                const c = escapeHtml(op.oldLine);
-                leftHtml += '<div class="cv-line"><span class="cv-gutter">' + lNum + '</span><span class="cv-content">' + c + '</span></div>';
-                rightHtml += '<div class="cv-line"><span class="cv-gutter">' + rNum + '</span><span class="cv-content">' + c + '</span></div>';
-            } else if (op.type === 'add') {
-                rNum++;
-                leftHtml += '<div class="cv-line cv-empty"><span class="cv-gutter"></span><span class="cv-content"></span></div>';
-                rightHtml += '<div class="cv-line cv-add"><span class="cv-gutter">' + rNum + '</span><span class="cv-content">' + escapeHtml(op.newLine) + '</span></div>';
-            } else if (op.type === 'remove') {
-                lNum++;
-                leftHtml += '<div class="cv-line cv-remove"><span class="cv-gutter">' + lNum + '</span><span class="cv-content">' + escapeHtml(op.oldLine) + '</span></div>';
-                rightHtml += '<div class="cv-line cv-empty"><span class="cv-gutter"></span><span class="cv-content"></span></div>';
-            }
-        }
-
-        dv.innerHTML =
-            '<div class="dv-side" id="dvLeft"><div class="dv-header">基线 (快照)</div>' + leftHtml + '</div>' +
-            '<div class="dv-divider"></div>' +
-            '<div class="dv-side" id="dvRight"><div class="dv-header">当前</div>' + rightHtml + '</div>';
-
-        const left = document.getElementById('dvLeft');
-        const right = document.getElementById('dvRight');
-        let syncing = false;
-        function sync(src, tgt) {
-            if (syncing) return;
-            syncing = true;
-            tgt.scrollTop = src.scrollTop;
-            tgt.scrollLeft = src.scrollLeft;
-            syncing = false;
-        }
-        left.addEventListener('scroll', () => sync(left, right));
-        right.addEventListener('scroll', () => sync(right, left));
-    }
 
     // ===== 智能编辑 =====
 
