@@ -691,7 +691,6 @@
             depthInfo.style.display = 'none';
             lastValidJSON = null;
             if (currentTab === 'diff') renderDiffView();
-            jumpToError();
         }
     }
 
@@ -765,6 +764,7 @@
         } else {
             showError(error);
             showToast('JSON 格式错误', 'error');
+            jumpToError();
         }
     }
 
@@ -1684,101 +1684,6 @@
             if (!raw) return;
             autoFormatAndBaseline(raw);
         }, 50);
-    });
-
-    // ===== 智能编辑 =====
-
-    function analyzeJsonContext(text, pos) {
-        let stack = [];
-        let inString = false;
-        let esc = false;
-
-        for (let i = 0; i < pos; i++) {
-            const ch = text[i];
-            if (esc) { esc = false; continue; }
-            if (ch === '\\' && inString) { esc = true; continue; }
-            if (ch === '"') { inString = !inString; continue; }
-            if (inString) continue;
-            if (ch === '[' || ch === '{') stack.push({ type: ch, pos: i });
-            else if (ch === ']' || ch === '}') { if (stack.length) stack.pop(); }
-        }
-
-        if (inString || stack.length === 0) return null;
-        const top = stack[stack.length - 1];
-        if (top.type !== '[') return null;
-
-        const lineStart = text.lastIndexOf('\n', top.pos) + 1;
-        const baseIndent = text.substring(lineStart, top.pos).match(/^(\s*)/)[1];
-        return { arrayStart: top.pos, baseIndent };
-    }
-
-    function createDefaultValue(sample) {
-        if (sample === null) return null;
-        if (typeof sample === 'string') return '';
-        if (typeof sample === 'number') return 0;
-        if (typeof sample === 'boolean') return false;
-        if (Array.isArray(sample)) return [];
-        if (typeof sample === 'object') {
-            const obj = {};
-            for (const [k, v] of Object.entries(sample)) obj[k] = createDefaultValue(v);
-            return obj;
-        }
-        return null;
-    }
-
-    function inferArrayTemplate(text, arrayStart, cursorPos) {
-        const fragment = text.substring(arrayStart, cursorPos);
-        const attempts = [
-            fragment + ']',
-            fragment.replace(/,\s*$/, '') + ']',
-            fragment.replace(/,?\s*$/, '') + ']'
-        ];
-
-        for (const attempt of attempts) {
-            try {
-                const parsed = JSON.parse(attempt);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    return createDefaultValue(parsed[0]);
-                }
-            } catch {}
-        }
-        return null;
-    }
-
-    inputEl.addEventListener('keydown', function(e) {
-        if (e.key !== ',') return;
-        if (inputEl.selectionStart !== inputEl.selectionEnd) return;
-
-        const text = inputEl.value;
-        const pos = inputEl.selectionStart;
-        const ctx = analyzeJsonContext(text, pos);
-        if (!ctx) return;
-
-        const template = inferArrayTemplate(text, ctx.arrayStart, pos);
-        if (template === null) return;
-
-        e.preventDefault();
-
-        const indent = getIndent();
-        const indentStr = indent === '\t' ? '\t' : ' '.repeat(indent);
-        const elemIndent = ctx.baseIndent + indentStr;
-        const templateJson = JSON.stringify(template, null, indent);
-        const formatted = templateJson.split('\n')
-            .map((line, i) => i === 0 ? line : elemIndent + line.trimStart())
-            .join('\n');
-
-        const insertion = ',\n' + elemIndent + formatted;
-        const before = text.substring(0, pos);
-        const after = text.substring(pos);
-        inputEl.value = before + insertion + after;
-
-        const firstEmpty = insertion.indexOf('""');
-        if (firstEmpty !== -1) {
-            inputEl.selectionStart = inputEl.selectionEnd = pos + firstEmpty + 1;
-        } else {
-            inputEl.selectionStart = inputEl.selectionEnd = pos + insertion.length;
-        }
-        onInputChange();
     });
 
     // ===== 拖拽文件支持 =====
