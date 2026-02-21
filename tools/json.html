@@ -347,6 +347,51 @@
         }
         .path-breadcrumb span:hover { color: var(--accent); }
 
+        /* Diff View (unified) */
+        .diff-view {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background: var(--bg-primary);
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            display: none;
+        }
+        .diff-view.active { display: block; }
+        .dv-line {
+            display: flex;
+            min-height: 1.6em;
+        }
+        .dv-gutter {
+            min-width: 48px;
+            padding: 0 8px 0 12px;
+            text-align: right;
+            color: var(--text-muted);
+            user-select: none;
+            flex-shrink: 0;
+            font-size: 0.85em;
+        }
+        .dv-content {
+            flex: 1;
+            white-space: pre;
+            padding-right: 16px;
+        }
+        .dv-add { background: rgba(34, 197, 94, 0.12); }
+        .dv-add .dv-gutter { color: var(--success); }
+        .dv-remove {
+            background: rgba(248, 113, 113, 0.12);
+        }
+        .dv-remove .dv-gutter { color: var(--error); }
+        .dv-remove .dv-content { text-decoration: line-through; opacity: 0.7; }
+        .dv-hint {
+            padding: 40px 24px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.8;
+        }
+
         /* 响应式 */
         @media (max-width: 768px) {
             .main-content { flex-direction: column; }
@@ -382,7 +427,8 @@
         <div class="toolbar-group">
             <button class="btn" onclick="document.getElementById('fileInput').click()">打开文件</button>
             <input type="file" id="fileInput" accept=".json,application/json" style="display:none" onchange="loadFromFile(event)">
-            <button class="btn" onclick="copyOutput()">复制结果</button>
+            <button class="btn" onclick="copyJSON()">复制</button>
+            <button class="btn success" onclick="saveBaseline()">重置基线</button>
             <button class="btn danger" onclick="clearAll()">清空</button>
         </div>
         <div class="toolbar-divider"></div>
@@ -415,8 +461,8 @@
         <!-- 输入面板 -->
         <div class="panel" id="inputPanel">
             <div class="panel-header">
-                <span>输入</span>
-                <span style="font-size:0.75rem;color:var(--text-muted)">粘贴或输入 JSON</span>
+                <span>编辑</span>
+                <span style="font-size:0.75rem;color:var(--text-muted)">粘贴自动格式化 · 编辑实时追踪差异</span>
             </div>
             <div class="editor-wrapper">
                 <textarea class="editor" id="inputEditor"
@@ -429,11 +475,11 @@
         <!-- 分割线 -->
         <div class="divider" id="divider"></div>
 
-        <!-- 输出面板 -->
+        <!-- 基线 / 差异面板 -->
         <div class="panel" id="outputPanel">
             <div class="panel-header">
                 <div style="display:flex;gap:4px;">
-                    <span class="tab active" id="tabCode" onclick="switchTab('code')">代码</span>
+                    <span class="tab active" id="tabDiff" onclick="switchTab('diff')">差异</span>
                     <span class="tab" id="tabTree" onclick="switchTab('tree')">树形</span>
                 </div>
                 <div style="display:flex;gap:6px;align-items:center">
@@ -448,9 +494,7 @@
                     <input type="text" placeholder="搜索键名或值..." id="searchInput" oninput="searchTree()">
                     <button onclick="clearSearch()">&#x2715;</button>
                 </div>
-                <textarea class="editor" id="outputEditor" readonly
-                    placeholder="格式化结果将显示在这里..."
-                    spellcheck="false"></textarea>
+                <div class="diff-view active" id="diffView"></div>
                 <div class="tree-view" id="treeView"></div>
             </div>
         </div>
@@ -463,7 +507,7 @@
     // ===== 核心功能 =====
 
     const inputEl = document.getElementById('inputEditor');
-    const outputEl = document.getElementById('outputEditor');
+    const diffEl = document.getElementById('diffView');
     const treeEl = document.getElementById('treeView');
     const errorBar = document.getElementById('errorBar');
     const statusDot = document.getElementById('statusDot');
@@ -472,8 +516,9 @@
     const lineInfo = document.getElementById('lineInfo');
     const depthInfo = document.getElementById('depthInfo');
 
-    let currentTab = 'code';
+    let currentTab = 'diff';
     let lastValidJSON = null;
+    let baselineText = null;
 
     function getIndent() {
         const v = document.getElementById('indentSize').value;
@@ -579,15 +624,15 @@
     // ===== 输入变化 =====
     function onInputChange() {
         const raw = inputEl.value.trim();
-        updateSize(raw);
+        updateSize(inputEl.value);
 
         if (!raw) {
             updateStatus('empty', '等待输入');
             hideError();
-            outputEl.value = '';
             treeEl.innerHTML = '';
             depthInfo.style.display = 'none';
             lastValidJSON = null;
+            if (currentTab === 'diff') renderDiffView();
             return;
         }
 
@@ -599,13 +644,14 @@
             const depth = getDepth(data);
             depthInfo.style.display = '';
             depthInfo.textContent = '深度: ' + depth;
-            outputEl.value = JSON.stringify(data, null, getIndent());
-            if (currentTab === 'tree') buildTree(data);
+            if (currentTab === 'diff') renderDiffView();
+            else if (currentTab === 'tree') buildTree(data);
         } else {
             updateStatus('invalid', 'JSON 无效');
             showError(error);
             depthInfo.style.display = 'none';
             lastValidJSON = null;
+            if (currentTab === 'diff') renderDiffView();
             jumpToError();
         }
     }
@@ -620,9 +666,11 @@
             return;
         }
         hideError();
-        outputEl.value = JSON.stringify(data, null, getIndent());
+        inputEl.value = JSON.stringify(data, null, getIndent());
         lastValidJSON = data;
-        if (currentTab === 'tree') buildTree(data);
+        updateSize(inputEl.value);
+        if (currentTab === 'diff') renderDiffView();
+        else if (currentTab === 'tree') buildTree(data);
         updateStatus('valid', 'JSON 有效');
         showToast('格式化完成', 'success');
     }
@@ -633,7 +681,9 @@
             if (error) showToast('JSON 格式错误', 'error');
             return;
         }
-        outputEl.value = JSON.stringify(data);
+        inputEl.value = JSON.stringify(data);
+        updateSize(inputEl.value);
+        if (currentTab === 'diff') renderDiffView();
         showToast('压缩完成', 'success');
     }
 
@@ -664,17 +714,19 @@
         }
 
         const sorted = sortObj(data);
-        outputEl.value = JSON.stringify(sorted, null, getIndent());
-        inputEl.value = outputEl.value;
+        inputEl.value = JSON.stringify(sorted, null, getIndent());
         lastValidJSON = sorted;
-        if (currentTab === 'tree') buildTree(sorted);
+        updateSize(inputEl.value);
+        if (currentTab === 'diff') renderDiffView();
+        else if (currentTab === 'tree') buildTree(sorted);
         showToast('键已按字母排序', 'success');
     }
 
     function escapeJSON() {
         const raw = inputEl.value.trim();
         if (!raw) return;
-        outputEl.value = JSON.stringify(raw);
+        inputEl.value = JSON.stringify(raw);
+        onInputChange();
         showToast('已转义', 'success');
     }
 
@@ -695,14 +747,13 @@
         }
     }
 
-    function copyOutput() {
-        const text = outputEl.value;
+    function copyJSON() {
+        const text = inputEl.value;
         if (!text) { showToast('没有可复制的内容', 'info'); return; }
         navigator.clipboard.writeText(text).then(() => {
             showToast('已复制到剪贴板', 'success');
         }).catch(() => {
-            // fallback
-            outputEl.select();
+            inputEl.select();
             document.execCommand('copy');
             showToast('已复制到剪贴板', 'success');
         });
@@ -710,27 +761,30 @@
 
     function clearAll() {
         inputEl.value = '';
-        outputEl.value = '';
         treeEl.innerHTML = '';
+        baselineText = null;
         hideError();
         updateStatus('empty', '等待输入');
         updateSize('');
         depthInfo.style.display = 'none';
         lastValidJSON = null;
+        if (currentTab === 'diff') renderDiffView();
     }
 
     // ===== Tab 切换 =====
 
     function switchTab(tab) {
         currentTab = tab;
-        document.getElementById('tabCode').className = 'tab' + (tab === 'code' ? ' active' : '');
+        document.getElementById('tabDiff').className = 'tab' + (tab === 'diff' ? ' active' : '');
         document.getElementById('tabTree').className = 'tab' + (tab === 'tree' ? ' active' : '');
 
-        if (tab === 'code') {
-            outputEl.style.display = '';
-            treeEl.classList.remove('active');
+        diffEl.classList.remove('active');
+        treeEl.classList.remove('active');
+
+        if (tab === 'diff') {
+            diffEl.classList.add('active');
+            renderDiffView();
         } else {
-            outputEl.style.display = 'none';
             treeEl.classList.add('active');
             if (lastValidJSON !== null) buildTree(lastValidJSON);
         }
@@ -1046,8 +1100,11 @@
         const reader = new FileReader();
         reader.onload = (e) => {
             setTimeout(() => {
-                inputEl.value = e.target.result;
-                onInputChange();
+                const content = e.target.result;
+                if (!autoFormatAndBaseline(content)) {
+                    inputEl.value = content;
+                    onInputChange();
+                }
                 const sizeMB = (file.size / 1048576).toFixed(1);
                 showToast('已加载: ' + file.name + ' (' + sizeMB + ' MB)', 'success');
             }, 50);
@@ -1116,6 +1173,141 @@
             inputEl.value = inputEl.value.substring(0, start) + indent + inputEl.value.substring(end);
             inputEl.selectionStart = inputEl.selectionEnd = start + indent.length;
         }
+    });
+
+    // ===== LCS Diff =====
+
+    function computeLineDiff(oldLines, newLines) {
+        const m = oldLines.length, n = newLines.length;
+        if (m * n > 10000000) return simpleDiff(oldLines, newLines);
+
+        const dp = [];
+        for (let i = 0; i <= m; i++) dp[i] = new Uint32Array(n + 1);
+        for (let i = 1; i <= m; i++) {
+            for (let j = 1; j <= n; j++) {
+                dp[i][j] = oldLines[i - 1] === newLines[j - 1]
+                    ? dp[i - 1][j - 1] + 1
+                    : Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+
+        const ops = [];
+        let i = m, j = n;
+        while (i > 0 || j > 0) {
+            if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+                ops.push({ type: 'same', line: oldLines[i - 1] });
+                i--; j--;
+            } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                ops.push({ type: 'add', line: newLines[j - 1] });
+                j--;
+            } else {
+                ops.push({ type: 'remove', line: oldLines[i - 1] });
+                i--;
+            }
+        }
+        return ops.reverse();
+    }
+
+    function simpleDiff(oldLines, newLines) {
+        const result = [];
+        const maxLen = Math.max(oldLines.length, newLines.length);
+        for (let i = 0; i < maxLen; i++) {
+            if (i < oldLines.length && i < newLines.length) {
+                if (oldLines[i] === newLines[i]) {
+                    result.push({ type: 'same', line: oldLines[i] });
+                } else {
+                    result.push({ type: 'remove', line: oldLines[i] });
+                    result.push({ type: 'add', line: newLines[i] });
+                }
+            } else if (i < oldLines.length) {
+                result.push({ type: 'remove', line: oldLines[i] });
+            } else {
+                result.push({ type: 'add', line: newLines[i] });
+            }
+        }
+        return result;
+    }
+
+    // ===== Diff View 渲染 =====
+
+    function renderDiffView() {
+        if (!baselineText) {
+            diffEl.innerHTML = '<div class="dv-hint">粘贴 JSON 后自动格式化并保存为基线<br>编辑左侧内容即可在此查看差异</div>';
+            return;
+        }
+
+        const currentText = inputEl.value;
+        if (!currentText.trim()) {
+            diffEl.innerHTML = '<div class="dv-hint">左侧无内容</div>';
+            return;
+        }
+
+        const oldLines = baselineText.split('\n');
+        const newLines = currentText.split('\n');
+        const diff = computeLineDiff(oldLines, newLines);
+
+        if (diff.every(op => op.type === 'same')) {
+            diffEl.innerHTML = '<div class="dv-hint">与基线一致，无差异</div>';
+            return;
+        }
+
+        let html = '';
+        let lineNum = 0;
+        for (const op of diff) {
+            if (op.type === 'same') {
+                lineNum++;
+                html += '<div class="dv-line"><span class="dv-gutter">' + lineNum +
+                    '</span><span class="dv-content">' + escapeHtml(op.line) + '</span></div>';
+            } else if (op.type === 'add') {
+                lineNum++;
+                html += '<div class="dv-line dv-add"><span class="dv-gutter">+ ' + lineNum +
+                    '</span><span class="dv-content">' + escapeHtml(op.line) + '</span></div>';
+            } else if (op.type === 'remove') {
+                html += '<div class="dv-line dv-remove"><span class="dv-gutter">-</span>' +
+                    '<span class="dv-content">' + escapeHtml(op.line) + '</span></div>';
+            }
+        }
+        diffEl.innerHTML = html;
+    }
+
+    // ===== 基线管理 =====
+
+    function saveBaseline() {
+        const { ok, data } = parseInput();
+        if (!ok) { showToast('请先输入有效 JSON', 'error'); return; }
+        baselineText = JSON.stringify(data, null, getIndent());
+        if (currentTab === 'diff') renderDiffView();
+        showToast('基线已更新', 'success');
+    }
+
+    function autoFormatAndBaseline(text) {
+        try {
+            const data = JSON.parse(text);
+            const formatted = JSON.stringify(data, null, getIndent());
+            inputEl.value = formatted;
+            baselineText = formatted;
+            lastValidJSON = data;
+            updateStatus('valid', 'JSON 有效');
+            hideError();
+            depthInfo.style.display = '';
+            depthInfo.textContent = '深度: ' + getDepth(data);
+            updateSize(formatted);
+            if (currentTab === 'diff') renderDiffView();
+            else if (currentTab === 'tree') buildTree(data);
+            showToast('已格式化并保存为基线', 'success');
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    // ===== 粘贴自动格式化 =====
+    inputEl.addEventListener('paste', () => {
+        setTimeout(() => {
+            const raw = inputEl.value.trim();
+            if (!raw) return;
+            autoFormatAndBaseline(raw);
+        }, 50);
     });
 
     // ===== 智能编辑 =====
@@ -1221,8 +1413,10 @@
         if (file && (file.name.endsWith('.json') || file.type === 'application/json')) {
             const reader = new FileReader();
             reader.onload = (ev) => {
-                inputEl.value = ev.target.result;
-                onInputChange();
+                if (!autoFormatAndBaseline(ev.target.result)) {
+                    inputEl.value = ev.target.result;
+                    onInputChange();
+                }
                 showToast('已加载文件: ' + file.name, 'success');
             };
             reader.readAsText(file);
