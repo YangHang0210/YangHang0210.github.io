@@ -414,17 +414,6 @@
             transition: background 0.12s;
         }
         .dv-val-span:hover { background: rgba(56, 189, 248, 0.22); }
-        .dv-delete-btn {
-            opacity: 0;
-            cursor: pointer;
-            color: var(--error);
-            margin-left: 6px;
-            font-size: 0.85em;
-            transition: opacity 0.15s, color 0.15s;
-            vertical-align: middle;
-        }
-        .dv-kv-wrap:hover .dv-delete-btn { opacity: 0.7; }
-        .dv-delete-btn:hover { opacity: 1 !important; color: #fca5a5; }
         .dv-inline-edit {
             background: var(--bg-tertiary);
             border: 1px solid var(--accent);
@@ -565,6 +554,7 @@
     let currentTab = 'diff';
     let lastValidJSON = null;
     let baselineText = null;
+    let autoFmtTimer = null;
 
     function getIndent() {
         const v = document.getElementById('indentSize').value;
@@ -672,6 +662,8 @@
         const raw = inputEl.value.trim();
         updateSize(inputEl.value);
 
+        if (autoFmtTimer) { clearTimeout(autoFmtTimer); autoFmtTimer = null; }
+
         if (!raw) {
             updateStatus('empty', '等待输入');
             hideError();
@@ -692,6 +684,7 @@
             depthInfo.textContent = '深度: ' + depth;
             if (currentTab === 'diff') renderDiffView();
             else if (currentTab === 'tree') buildTree(data);
+            autoFmtTimer = setTimeout(autoFormatInPlace, 600);
         } else {
             updateStatus('invalid', 'JSON 无效');
             showError(error);
@@ -700,6 +693,36 @@
             if (currentTab === 'diff') renderDiffView();
             jumpToError();
         }
+    }
+
+    function autoFormatInPlace() {
+        autoFmtTimer = null;
+        const { ok, data } = parseInput();
+        if (!ok) return;
+
+        const formatted = JSON.stringify(data, null, getIndent());
+        if (inputEl.value === formatted) return;
+
+        const pos = inputEl.selectionStart;
+        const before = inputEl.value.substring(0, pos);
+        let nonWs = 0;
+        for (let i = 0; i < before.length; i++) {
+            if (!/\s/.test(before[i])) nonWs++;
+        }
+
+        inputEl.value = formatted;
+        lastValidJSON = data;
+
+        let count = 0, newPos = formatted.length;
+        for (let i = 0; i < formatted.length; i++) {
+            if (!/\s/.test(formatted[i])) count++;
+            if (count >= nonWs) { newPos = i + 1; break; }
+        }
+        inputEl.selectionStart = inputEl.selectionEnd = newPos;
+
+        updateSize(formatted);
+        if (currentTab === 'diff') renderDiffView();
+        else if (currentTab === 'tree') buildTree(data);
     }
 
     // ===== 工具栏操作 =====
@@ -1409,7 +1432,6 @@
                 '<span class="dv-key-span">&quot;' + escapeHtml(keyRaw) + '&quot;</span>' +
                 ': ' +
                 '<span class="dv-val-span">' + escapeHtml(valRaw) + '</span>' +
-                '<span class="dv-delete-btn" title="删除此键">×</span>' +
                 '</span>' + escapeHtml(trailing);
         }
 
@@ -1423,7 +1445,6 @@
         return escapeHtml(indent) +
             '<span class="dv-kv-wrap" data-path=\'' + pathAttr + '\'>' +
             '<span class="dv-val-span">' + escapeHtml(valRaw) + '</span>' +
-            '<span class="dv-delete-btn" title="删除此元素">×</span>' +
             '</span>' + escapeHtml(trailing);
     }
 
@@ -1606,28 +1627,6 @@
         showToast('已更新', 'success');
     }
 
-    function deleteKey(path) {
-        let data;
-        try { data = JSON.parse(inputEl.value); } catch { showToast('JSON 解析失败', 'error'); return; }
-
-        const parentPath = path.slice(0, -1);
-        const lastKey = path[path.length - 1];
-        const parent = navigatePath(data, parentPath);
-        if (parent === undefined) { showToast('路径导航失败', 'error'); return; }
-
-        if (Array.isArray(parent)) {
-            parent.splice(lastKey, 1);
-        } else {
-            delete parent[lastKey];
-        }
-
-        const formatted = JSON.stringify(data, null, getIndent());
-        inputEl.value = formatted;
-        lastValidJSON = data;
-        onInputChange();
-        showToast('已删除', 'success');
-    }
-
     // ===== Diff 视图事件委托 =====
 
     diffEl.addEventListener('click', function(e) {
@@ -1643,16 +1642,6 @@
         if (target.classList.contains('dv-val-span')) {
             e.stopPropagation();
             startInlineEdit(target, 'value');
-            return;
-        }
-
-        if (target.classList.contains('dv-delete-btn')) {
-            e.stopPropagation();
-            const wrap = target.closest('.dv-kv-wrap');
-            if (!wrap) return;
-            const pathStr = wrap.dataset.path;
-            if (!pathStr) return;
-            deleteKey(JSON.parse(pathStr));
             return;
         }
     });
