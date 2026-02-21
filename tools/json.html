@@ -1163,7 +1163,10 @@
         }
     });
 
-    // ===== Tab 键缩进支持 =====
+    // ===== Tab 键缩进 + 括号引号自动补全 =====
+    const PAIRS = { '"': '"', '{': '}', '[': ']' };
+    const CLOSE_CHARS = new Set(['"', '}', ']']);
+
     inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
             e.preventDefault();
@@ -1172,6 +1175,51 @@
             const indent = getIndent() === '\t' ? '\t' : ' '.repeat(getIndent());
             inputEl.value = inputEl.value.substring(0, start) + indent + inputEl.value.substring(end);
             inputEl.selectionStart = inputEl.selectionEnd = start + indent.length;
+            return;
+        }
+
+        const pos = inputEl.selectionStart;
+        const text = inputEl.value;
+        const after = text[pos];
+
+        if (CLOSE_CHARS.has(e.key) && after === e.key) {
+            e.preventDefault();
+            inputEl.selectionStart = inputEl.selectionEnd = pos + 1;
+            return;
+        }
+
+        const close = PAIRS[e.key];
+        if (!close) return;
+
+        if (e.key === '"') {
+            let quotes = 0;
+            for (let i = 0; i < pos; i++) {
+                if (text[i] === '"' && (i === 0 || text[i - 1] !== '\\')) quotes++;
+            }
+            if (quotes % 2 === 1) return;
+        }
+
+        e.preventDefault();
+        const before = text.substring(0, pos);
+        const sel = text.substring(pos, inputEl.selectionEnd);
+        const rest = text.substring(inputEl.selectionEnd);
+        inputEl.value = before + e.key + sel + close + rest;
+        inputEl.selectionStart = inputEl.selectionEnd = pos + 1;
+        onInputChange();
+    });
+
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Backspace') return;
+        const pos = inputEl.selectionStart;
+        if (pos !== inputEl.selectionEnd || pos === 0) return;
+        const text = inputEl.value;
+        const ch = text[pos - 1];
+        const close = PAIRS[ch];
+        if (close && text[pos] === close) {
+            e.preventDefault();
+            inputEl.value = text.substring(0, pos - 1) + text.substring(pos + 1);
+            inputEl.selectionStart = inputEl.selectionEnd = pos - 1;
+            onInputChange();
         }
     });
 
