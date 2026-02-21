@@ -391,6 +391,52 @@
             font-size: 0.9rem;
             line-height: 1.8;
         }
+        .dv-kv-wrap {
+            display: inline;
+            position: relative;
+            border-radius: 3px;
+            padding: 1px 0;
+            transition: background 0.15s;
+        }
+        .dv-kv-wrap:hover {
+            background: rgba(56, 189, 248, 0.12);
+        }
+        .dv-key-span {
+            cursor: pointer;
+            border-radius: 2px;
+            color: #7dd3fc;
+            transition: background 0.12s;
+        }
+        .dv-key-span:hover { background: rgba(56, 189, 248, 0.22); }
+        .dv-val-span {
+            cursor: pointer;
+            border-radius: 2px;
+            transition: background 0.12s;
+        }
+        .dv-val-span:hover { background: rgba(56, 189, 248, 0.22); }
+        .dv-delete-btn {
+            opacity: 0;
+            cursor: pointer;
+            color: var(--error);
+            margin-left: 6px;
+            font-size: 0.85em;
+            transition: opacity 0.15s, color 0.15s;
+            vertical-align: middle;
+        }
+        .dv-kv-wrap:hover .dv-delete-btn { opacity: 0.7; }
+        .dv-delete-btn:hover { opacity: 1 !important; color: #fca5a5; }
+        .dv-inline-edit {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--accent);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+            padding: 0 4px;
+            border-radius: 3px;
+            outline: none;
+            min-width: 40px;
+        }
 
         /* 响应式 */
         @media (max-width: 768px) {
@@ -1276,47 +1322,340 @@
         return result;
     }
 
+    // ===== JSON Path 追踪 =====
+
+    function buildLinePathMap(text) {
+        const lines = text.split('\n');
+        const map = {};
+        let parentKeys = [];
+        let stack = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let trimmed = lines[i].trim();
+            let cleaned = trimmed.replace(/,\s*$/, '');
+            if (!cleaned) continue;
+
+            const kvMatch = cleaned.match(/^"((?:[^"\\]|\\.)*)"\s*:\s*(.*)$/);
+            if (kvMatch) {
+                let key;
+                try { key = JSON.parse('"' + kvMatch[1] + '"'); } catch { key = kvMatch[1]; }
+                let val = kvMatch[2].trim();
+                const path = parentKeys.slice().concat(key);
+
+                if (val === '{') {
+                    map[i] = { path, isLeafKV: false, key };
+                    parentKeys.push(key);
+                    stack.push({ type: 'object', arrayIndex: 0, hasParentKey: true });
+                } else if (val === '[') {
+                    map[i] = { path, isLeafKV: false, key };
+                    parentKeys.push(key);
+                    stack.push({ type: 'array', arrayIndex: 0, hasParentKey: true });
+                } else {
+                    map[i] = { path, isLeafKV: true, key };
+                }
+                continue;
+            }
+
+            if (cleaned === '{' || cleaned === '[') {
+                const isArr = cleaned === '[';
+                let hasPK = false;
+                if (stack.length > 0 && stack[stack.length - 1].type === 'array') {
+                    const idx = stack[stack.length - 1].arrayIndex;
+                    parentKeys.push(idx);
+                    stack[stack.length - 1].arrayIndex++;
+                    hasPK = true;
+                }
+                stack.push({ type: isArr ? 'array' : 'object', arrayIndex: 0, hasParentKey: hasPK });
+                continue;
+            }
+
+            if (cleaned === '}' || cleaned === ']') {
+                if (stack.length > 0) {
+                    const popped = stack.pop();
+                    if (popped.hasParentKey) parentKeys.pop();
+                }
+                continue;
+            }
+
+            if (stack.length > 0 && stack[stack.length - 1].type === 'array') {
+                const idx = stack[stack.length - 1].arrayIndex;
+                const path = parentKeys.slice().concat(idx);
+                map[i] = { path, isLeafKV: true, arrayIndex: idx };
+                stack[stack.length - 1].arrayIndex++;
+            }
+        }
+
+        return map;
+    }
+
+    // ===== 交互行渲染 =====
+
+    function renderInteractiveLine(lineText, pathInfo) {
+        if (!pathInfo || !pathInfo.isLeafKV) return escapeHtml(lineText);
+
+        const pathAttr = escapeHtml(JSON.stringify(pathInfo.path));
+
+        if (pathInfo.key !== undefined) {
+            const match = lineText.match(/^(\s*)"((?:[^"\\]|\\.)*)"\s*:\s*(.+?)(,?\s*)$/);
+            if (!match) return escapeHtml(lineText);
+
+            const indent = match[1];
+            const keyRaw = match[2];
+            const valRaw = match[3];
+            const trailing = match[4];
+
+            return escapeHtml(indent) +
+                '<span class="dv-kv-wrap" data-path=\'' + pathAttr + '\'>' +
+                '<span class="dv-key-span">&quot;' + escapeHtml(keyRaw) + '&quot;</span>' +
+                ': ' +
+                '<span class="dv-val-span">' + escapeHtml(valRaw) + '</span>' +
+                '<span class="dv-delete-btn" title="删除此键">×</span>' +
+                '</span>' + escapeHtml(trailing);
+        }
+
+        const match = lineText.match(/^(\s*)(.+?)(,?\s*)$/);
+        if (!match) return escapeHtml(lineText);
+
+        const indent = match[1];
+        const valRaw = match[2];
+        const trailing = match[3];
+
+        return escapeHtml(indent) +
+            '<span class="dv-kv-wrap" data-path=\'' + pathAttr + '\'>' +
+            '<span class="dv-val-span">' + escapeHtml(valRaw) + '</span>' +
+            '<span class="dv-delete-btn" title="删除此元素">×</span>' +
+            '</span>' + escapeHtml(trailing);
+    }
+
     // ===== Diff View 渲染 =====
 
     function renderDiffView() {
-        if (!baselineText) {
-            diffEl.innerHTML = '<div class="dv-hint">粘贴 JSON 后自动格式化并保存为基线<br>编辑左侧内容即可在此查看差异</div>';
+        const currentText = inputEl.value;
+
+        if (!currentText.trim()) {
+            if (!baselineText) {
+                diffEl.innerHTML = '<div class="dv-hint">粘贴 JSON 后自动格式化并保存为基线<br>编辑左侧内容即可在此查看差异</div>';
+            } else {
+                diffEl.innerHTML = '<div class="dv-hint">左侧无内容</div>';
+            }
             return;
         }
 
-        const currentText = inputEl.value;
-        if (!currentText.trim()) {
-            diffEl.innerHTML = '<div class="dv-hint">左侧无内容</div>';
+        let parsed;
+        try { parsed = JSON.parse(currentText); } catch { parsed = null; }
+
+        const pathMap = parsed ? buildLinePathMap(currentText) : {};
+
+        if (!baselineText) {
+            const lines = currentText.split('\n');
+            let html = '';
+            for (let i = 0; i < lines.length; i++) {
+                const content = parsed ? renderInteractiveLine(lines[i], pathMap[i]) : escapeHtml(lines[i]);
+                html += '<div class="dv-line"><span class="dv-gutter">' + (i + 1) +
+                    '</span><span class="dv-content">' + content + '</span></div>';
+            }
+            diffEl.innerHTML = html;
             return;
         }
 
         const oldLines = baselineText.split('\n');
         const newLines = currentText.split('\n');
         const diff = computeLineDiff(oldLines, newLines);
-
-        if (diff.every(op => op.type === 'same')) {
-            diffEl.innerHTML = '<div class="dv-hint">与基线一致，无差异</div>';
-            return;
-        }
+        const noDiff = diff.every(op => op.type === 'same');
 
         let html = '';
-        let lineNum = 0;
+        let newLineIdx = 0;
+        let displayNum = 0;
+
         for (const op of diff) {
             if (op.type === 'same') {
-                lineNum++;
-                html += '<div class="dv-line"><span class="dv-gutter">' + lineNum +
-                    '</span><span class="dv-content">' + escapeHtml(op.line) + '</span></div>';
+                displayNum++;
+                const content = parsed ? renderInteractiveLine(op.line, pathMap[newLineIdx]) : escapeHtml(op.line);
+                html += '<div class="dv-line"><span class="dv-gutter">' + displayNum +
+                    '</span><span class="dv-content">' + content + '</span></div>';
+                newLineIdx++;
             } else if (op.type === 'add') {
-                lineNum++;
-                html += '<div class="dv-line dv-add"><span class="dv-gutter">+ ' + lineNum +
-                    '</span><span class="dv-content">' + escapeHtml(op.line) + '</span></div>';
+                displayNum++;
+                const content = parsed ? renderInteractiveLine(op.line, pathMap[newLineIdx]) : escapeHtml(op.line);
+                html += '<div class="dv-line dv-add"><span class="dv-gutter">+ ' + displayNum +
+                    '</span><span class="dv-content">' + content + '</span></div>';
+                newLineIdx++;
             } else if (op.type === 'remove') {
                 html += '<div class="dv-line dv-remove"><span class="dv-gutter">-</span>' +
                     '<span class="dv-content">' + escapeHtml(op.line) + '</span></div>';
             }
         }
+
+        if (noDiff && html) {
+            html = '<div class="dv-hint" style="padding:8px 16px;font-size:0.8rem">与基线一致，无差异 — 点击下方 key/value 可直接编辑</div>' + html;
+        }
+
         diffEl.innerHTML = html;
     }
+
+    // ===== 路径导航与值解析 =====
+
+    function navigatePath(obj, path) {
+        let current = obj;
+        for (const key of path) {
+            if (current === null || current === undefined || typeof current !== 'object') return undefined;
+            current = current[key];
+        }
+        return current;
+    }
+
+    function parseJsonValue(str) {
+        const trimmed = str.trim();
+        if (trimmed === 'null') return null;
+        if (trimmed === 'true') return true;
+        if (trimmed === 'false') return false;
+        if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(trimmed)) return Number(trimmed);
+        try { return JSON.parse(trimmed); } catch {}
+        return str;
+    }
+
+    // ===== 内联编辑 =====
+
+    function startInlineEdit(span, editType) {
+        if (span.querySelector('.dv-inline-edit')) return;
+
+        const wrap = span.closest('.dv-kv-wrap');
+        if (!wrap) return;
+        const pathStr = wrap.dataset.path;
+        if (!pathStr) return;
+
+        const path = JSON.parse(pathStr);
+        const originalText = span.textContent;
+
+        let editValue = originalText;
+        if (editValue.startsWith('"') && editValue.endsWith('"')) {
+            editValue = editValue.slice(1, -1);
+        }
+
+        const input = document.createElement('input');
+        input.className = 'dv-inline-edit';
+        input.type = 'text';
+        input.value = editValue;
+        input.style.width = Math.max(editValue.length * 8 + 24, 48) + 'px';
+
+        span.textContent = '';
+        span.appendChild(input);
+        input.focus();
+        input.select();
+
+        let done = false;
+
+        function commit() {
+            if (done) return;
+            done = true;
+            const newVal = input.value;
+            if (newVal !== editValue) {
+                commitEdit(path, editType, newVal);
+            } else {
+                span.textContent = originalText;
+            }
+        }
+
+        function cancel() {
+            if (done) return;
+            done = true;
+            span.textContent = originalText;
+        }
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            e.stopPropagation();
+        });
+
+        input.addEventListener('blur', commit);
+
+        input.addEventListener('input', function() {
+            this.style.width = Math.max(this.value.length * 8 + 24, 48) + 'px';
+        });
+    }
+
+    // ===== 编辑同步 =====
+
+    function commitEdit(path, editType, newValue) {
+        let data;
+        try { data = JSON.parse(inputEl.value); } catch { showToast('JSON 解析失败', 'error'); return; }
+
+        const parentPath = path.slice(0, -1);
+        const lastKey = path[path.length - 1];
+        const parent = navigatePath(data, parentPath);
+        if (parent === undefined) { showToast('路径导航失败', 'error'); return; }
+
+        if (editType === 'value') {
+            parent[lastKey] = parseJsonValue(newValue);
+        } else if (editType === 'key') {
+            if (typeof lastKey !== 'string') { showToast('数组索引不可重命名', 'error'); return; }
+            if (newValue === lastKey) return;
+            if (newValue in parent) { showToast('键名已存在: ' + newValue, 'error'); return; }
+
+            const entries = Object.entries(parent);
+            const rebuilt = entries.map(([k, v]) => k === lastKey ? [newValue, v] : [k, v]);
+            for (const k of Object.keys(parent)) delete parent[k];
+            for (const [k, v] of rebuilt) parent[k] = v;
+        }
+
+        const formatted = JSON.stringify(data, null, getIndent());
+        inputEl.value = formatted;
+        lastValidJSON = data;
+        onInputChange();
+        showToast('已更新', 'success');
+    }
+
+    function deleteKey(path) {
+        let data;
+        try { data = JSON.parse(inputEl.value); } catch { showToast('JSON 解析失败', 'error'); return; }
+
+        const parentPath = path.slice(0, -1);
+        const lastKey = path[path.length - 1];
+        const parent = navigatePath(data, parentPath);
+        if (parent === undefined) { showToast('路径导航失败', 'error'); return; }
+
+        if (Array.isArray(parent)) {
+            parent.splice(lastKey, 1);
+        } else {
+            delete parent[lastKey];
+        }
+
+        const formatted = JSON.stringify(data, null, getIndent());
+        inputEl.value = formatted;
+        lastValidJSON = data;
+        onInputChange();
+        showToast('已删除', 'success');
+    }
+
+    // ===== Diff 视图事件委托 =====
+
+    diffEl.addEventListener('click', function(e) {
+        const target = e.target;
+        if (target.classList.contains('dv-inline-edit')) return;
+
+        if (target.classList.contains('dv-key-span')) {
+            e.stopPropagation();
+            startInlineEdit(target, 'key');
+            return;
+        }
+
+        if (target.classList.contains('dv-val-span')) {
+            e.stopPropagation();
+            startInlineEdit(target, 'value');
+            return;
+        }
+
+        if (target.classList.contains('dv-delete-btn')) {
+            e.stopPropagation();
+            const wrap = target.closest('.dv-kv-wrap');
+            if (!wrap) return;
+            const pathStr = wrap.dataset.path;
+            if (!pathStr) return;
+            deleteKey(JSON.parse(pathStr));
+            return;
+        }
+    });
 
     // ===== 基线管理 =====
 
