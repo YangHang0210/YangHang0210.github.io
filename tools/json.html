@@ -703,6 +703,7 @@
         if (inputEl.value === formatted) return;
 
         const pos = inputEl.selectionStart;
+        const savedScroll = inputEl.scrollTop;
         const before = inputEl.value.substring(0, pos);
         let nonWs = 0;
         for (let i = 0; i < before.length; i++) {
@@ -718,6 +719,7 @@
             if (count >= nonWs) { newPos = i + 1; break; }
         }
         inputEl.selectionStart = inputEl.selectionEnd = newPos;
+        inputEl.scrollTop = savedScroll;
 
         updateSize(formatted);
         if (currentTab === 'diff') renderDiffView();
