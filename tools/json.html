@@ -470,8 +470,8 @@
         <div class="toolbar-group">
             <label style="font-size:0.82rem;color:var(--text-secondary)">缩进:</label>
             <select class="indent-select" id="indentSize" onchange="formatJSON()">
-                <option value="2" selected>2 空格</option>
-                <option value="4">4 空格</option>
+                <option value="2">2 空格</option>
+                <option value="4" selected>4 空格</option>
                 <option value="tab">Tab</option>
             </select>
         </div>
@@ -497,7 +497,7 @@
         <div class="panel" id="inputPanel">
             <div class="panel-header">
                 <span>编辑</span>
-                <span style="font-size:0.75rem;color:var(--text-muted)">粘贴自动格式化 · 编辑实时追踪差异</span>
+                <span style="font-size:0.75rem;color:var(--text-muted)">编辑实时追踪差异</span>
             </div>
             <div class="editor-wrapper">
                 <textarea class="editor" id="inputEditor"
@@ -554,7 +554,7 @@
     let currentTab = 'diff';
     let lastValidJSON = null;
     let baselineText = null;
-    let autoFmtTimer = null;
+    
 
     function getIndent() {
         const v = document.getElementById('indentSize').value;
@@ -662,8 +662,6 @@
         const raw = inputEl.value.trim();
         updateSize(inputEl.value);
 
-        if (autoFmtTimer) { clearTimeout(autoFmtTimer); autoFmtTimer = null; }
-
         if (!raw) {
             updateStatus('empty', '等待输入');
             hideError();
@@ -684,7 +682,6 @@
             depthInfo.textContent = '深度: ' + depth;
             if (currentTab === 'diff') renderDiffView();
             else if (currentTab === 'tree') buildTree(data);
-            autoFmtTimer = setTimeout(autoFormatInPlace, 600);
         } else {
             updateStatus('invalid', 'JSON 无效');
             showError(error);
@@ -692,38 +689,6 @@
             lastValidJSON = null;
             if (currentTab === 'diff') renderDiffView();
         }
-    }
-
-    function autoFormatInPlace() {
-        autoFmtTimer = null;
-        const { ok, data } = parseInput();
-        if (!ok) return;
-
-        const formatted = JSON.stringify(data, null, getIndent());
-        if (inputEl.value === formatted) return;
-
-        const pos = inputEl.selectionStart;
-        const savedScroll = inputEl.scrollTop;
-        const before = inputEl.value.substring(0, pos);
-        let nonWs = 0;
-        for (let i = 0; i < before.length; i++) {
-            if (!/\s/.test(before[i])) nonWs++;
-        }
-
-        inputEl.value = formatted;
-        lastValidJSON = data;
-
-        let count = 0, newPos = formatted.length;
-        for (let i = 0; i < formatted.length; i++) {
-            if (!/\s/.test(formatted[i])) count++;
-            if (count >= nonWs) { newPos = i + 1; break; }
-        }
-        inputEl.selectionStart = inputEl.selectionEnd = newPos;
-        inputEl.scrollTop = savedScroll;
-
-        updateSize(formatted);
-        if (currentTab === 'diff') renderDiffView();
-        else if (currentTab === 'tree') buildTree(data);
     }
 
     // ===== 工具栏操作 =====
@@ -1234,10 +1199,7 @@
         }
     });
 
-    // ===== Tab 键缩进 + 括号引号自动补全 =====
-    const PAIRS = { '"': '"', '{': '}', '[': ']' };
-    const CLOSE_CHARS = new Set(['"', '}', ']']);
-
+    // ===== Tab 键缩进 =====
     inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
             e.preventDefault();
@@ -1246,51 +1208,6 @@
             const indent = getIndent() === '\t' ? '\t' : ' '.repeat(getIndent());
             inputEl.value = inputEl.value.substring(0, start) + indent + inputEl.value.substring(end);
             inputEl.selectionStart = inputEl.selectionEnd = start + indent.length;
-            return;
-        }
-
-        const pos = inputEl.selectionStart;
-        const text = inputEl.value;
-        const after = text[pos];
-
-        if (CLOSE_CHARS.has(e.key) && after === e.key) {
-            e.preventDefault();
-            inputEl.selectionStart = inputEl.selectionEnd = pos + 1;
-            return;
-        }
-
-        const close = PAIRS[e.key];
-        if (!close) return;
-
-        if (e.key === '"') {
-            let quotes = 0;
-            for (let i = 0; i < pos; i++) {
-                if (text[i] === '"' && (i === 0 || text[i - 1] !== '\\')) quotes++;
-            }
-            if (quotes % 2 === 1) return;
-        }
-
-        e.preventDefault();
-        const before = text.substring(0, pos);
-        const sel = text.substring(pos, inputEl.selectionEnd);
-        const rest = text.substring(inputEl.selectionEnd);
-        inputEl.value = before + e.key + sel + close + rest;
-        inputEl.selectionStart = inputEl.selectionEnd = pos + 1;
-        onInputChange();
-    });
-
-    inputEl.addEventListener('keydown', (e) => {
-        if (e.key !== 'Backspace') return;
-        const pos = inputEl.selectionStart;
-        if (pos !== inputEl.selectionEnd || pos === 0) return;
-        const text = inputEl.value;
-        const ch = text[pos - 1];
-        const close = PAIRS[ch];
-        if (close && text[pos] === close) {
-            e.preventDefault();
-            inputEl.value = text.substring(0, pos - 1) + text.substring(pos + 1);
-            inputEl.selectionStart = inputEl.selectionEnd = pos - 1;
-            onInputChange();
         }
     });
 
