@@ -442,7 +442,7 @@
                         return encodeURIComponent(k) + '=' + encodeURIComponent(val);
                     })
                     .join('&');
-                parts.push("  --data-urlencode '" + params.replace(/'/g, "'\\''") + "'");
+                parts.push("  -d '" + params.replace(/'/g, "'\\''") + "'");
             }
         }
 
@@ -460,7 +460,7 @@
             .replace(/(-H\s+')([^:]+):\s*([^']*)/g, function(_, flag, key, val) {
                 return flag + '<span class="curl-header-key">' + key + '</span>: <span class="curl-header-val">' + val + '</span>';
             })
-            .replace(/(--?d(?:ata-urlencode)?)\s+'/g, '<span class="curl-flag">$1</span> \'');
+            .replace(/(--?d(?:ata[-\w]*)?)\s+'/g, '<span class="curl-flag">$1</span> \'');
     }
 
     // ============================================================
@@ -566,7 +566,7 @@
                                 var v = typeof body[k] === 'object' ? JSON.stringify(body[k]) : String(body[k]);
                                 return encodeURIComponent(k) + '=' + encodeURIComponent(v);
                             }).join('&');
-                            parts.push("  --data-urlencode '" + params.replace(/'/g, "'\\''") + "'");
+                            parts.push("  -d '" + params.replace(/'/g, "'\\''") + "'");
                         }
                     }
                     return parts.join(" \\\n");
