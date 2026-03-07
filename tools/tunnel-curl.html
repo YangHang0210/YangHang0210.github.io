@@ -412,12 +412,15 @@
         const prettyBody = !!options.prettyBody;
 
         const method = (detail.method || 'GET').toUpperCase();
-        const url = detail.url || '';
+        var url = detail.url || '';
+        if (url.startsWith('http://')) {
+            url = 'https://' + url.substring(7);
+        }
         const headers = detail.headers || {};
         const requestBody = detail.request || {};
 
         const parts = [];
-        parts.push("curl -X " + method + " '" + url + "'");
+        parts.push("curl -L -X " + method + " '" + url + "'");
 
         const headerEntries = Object.entries(headers);
         for (const [key, value] of headerEntries) {
@@ -435,14 +438,11 @@
                     : JSON.stringify(requestBody);
                 parts.push("  -d '" + body.replace(/'/g, "'\\''") + "'");
             } else {
-                const params = Object.entries(requestBody)
-                    .map(function(pair) {
-                        var k = pair[0], v = pair[1];
-                        var val = typeof v === 'object' ? JSON.stringify(v) : String(v);
-                        return encodeURIComponent(k) + '=' + encodeURIComponent(val);
-                    })
-                    .join('&');
-                parts.push("  -d '" + params.replace(/'/g, "'\\''") + "'");
+                for (const [k, v] of Object.entries(requestBody)) {
+                    const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
+                    const safeVal = val.replace(/'/g, "'\\''");
+                    parts.push("  --data-urlencode '" + k + "=" + safeVal + "'");
+                }
             }
         }
 
@@ -550,9 +550,10 @@
                 function genCurl(d) {
                     var method = (d.method || 'GET').toUpperCase();
                     var url = d.url || '';
+                    if (url.indexOf('http://') === 0) url = 'https://' + url.substring(7);
                     var headers = d.headers || {};
                     var body = d.request || {};
-                    var parts = ["curl -X " + method + " '" + url + "'"];
+                    var parts = ["curl -L -X " + method + " '" + url + "'"];
                     Object.keys(headers).forEach(function(k) {
                         if (AUTO_HEADERS[k.toLowerCase()]) return;
                         parts.push("  -H '" + k + ": " + String(headers[k]).replace(/'/g, "'\\''") + "'");
@@ -562,11 +563,10 @@
                         if (ct.indexOf('application/json') >= 0) {
                             parts.push("  -d '" + JSON.stringify(body).replace(/'/g, "'\\''") + "'");
                         } else {
-                            var params = Object.keys(body).map(function(k) {
+                            Object.keys(body).forEach(function(k) {
                                 var v = typeof body[k] === 'object' ? JSON.stringify(body[k]) : String(body[k]);
-                                return encodeURIComponent(k) + '=' + encodeURIComponent(v);
-                            }).join('&');
-                            parts.push("  -d '" + params.replace(/'/g, "'\\''") + "'");
+                                parts.push("  --data-urlencode '" + k + "=" + v.replace(/'/g, "'\\''") + "'");
+                            });
                         }
                     }
                     return parts.join(" \\\n");
