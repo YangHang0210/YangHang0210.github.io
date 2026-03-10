@@ -270,7 +270,7 @@
     <nav class="navbar">
         <a href="../index.html" class="back">&larr; 返回</a>
         <h1>Tunnel to cURL</h1>
-        <span style="margin-left:auto;font-size:0.72rem;color:var(--text-muted)"></span>
+        <span style="margin-left:auto;font-size:0.72rem;color:var(--text-muted)">v1.2.0</span>
     </nav>
 
     <div class="tab-bar">
@@ -406,6 +406,26 @@
     }
 
     /**
+     * 尝试将请求体中值为 JSON 字符串的字段还原为对象，保留嵌套结构
+     */
+    function parseBodyValues(body) {
+        var result = {};
+        for (var k in body) {
+            if (!Object.prototype.hasOwnProperty.call(body, k)) continue;
+            var v = body[k];
+            if (typeof v === 'string') {
+                var trimmed = v.trim();
+                if ((trimmed.charAt(0) === '{' && trimmed.charAt(trimmed.length - 1) === '}') ||
+                    (trimmed.charAt(0) === '[' && trimmed.charAt(trimmed.length - 1) === ']')) {
+                    try { result[k] = JSON.parse(trimmed); continue; } catch (e) {}
+                }
+            }
+            result[k] = v;
+        }
+        return result;
+    }
+
+    /**
      * 核心: 根据 detail 生成 cURL 命令字符串
      * @param {Object} detail - Tunnel 请求详情
      * @param {Object} options - { skipAutoHeaders, prettyBody }
@@ -429,6 +449,11 @@
 
         const contentType = headers['Content-Type'] || headers['content-type'] || '';
         const isMultipart = contentType.includes('multipart/form-data');
+        const hasJsonContentType = contentType.includes('application/json');
+
+        if (method !== 'GET' && Object.keys(requestBody).length > 0 && !isMultipart && !hasJsonContentType) {
+            parts.push("  -H 'Content-Type: application/json'");
+        }
 
         const headerEntries = Object.entries(headers);
         for (const [key, value] of headerEntries) {
@@ -439,17 +464,18 @@
         }
 
         if (method !== 'GET' && Object.keys(requestBody).length > 0) {
-            if (contentType.includes('application/json')) {
-                const body = prettyBody
-                    ? JSON.stringify(requestBody, null, 2)
-                    : JSON.stringify(requestBody);
-                parts.push("  -d '" + body.replace(/'/g, "'\\''") + "'");
-            } else {
+            if (isMultipart) {
                 for (const [k, v] of Object.entries(requestBody)) {
                     const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
                     const safeVal = val.replace(/'/g, "'\\''");
                     parts.push("  --data-urlencode '" + k + "=" + safeVal + "'");
                 }
+            } else {
+                const parsedBody = parseBodyValues(requestBody);
+                const body = prettyBody
+                    ? JSON.stringify(parsedBody, null, 2)
+                    : JSON.stringify(parsedBody);
+                parts.push("  --data-raw '" + body.replace(/'/g, "'\\''") + "'");
             }
         }
 
@@ -549,6 +575,22 @@
                 var AUTO_HEADERS = {'content-length':1,'accept-encoding':1,'connection':1,'x-forwarded-for':1,'x-real-ip':1};
                 var _doneTs = 0;
 
+                function parseBodyValues(b) {
+                    var result = {};
+                    Object.keys(b).forEach(function(k) {
+                        var v = b[k];
+                        if (typeof v === 'string') {
+                            var tr = v.trim();
+                            if ((tr.charAt(0) === '{' && tr.charAt(tr.length-1) === '}') ||
+                                (tr.charAt(0) === '[' && tr.charAt(tr.length-1) === ']')) {
+                                try { result[k] = JSON.parse(tr); return; } catch(e) {}
+                            }
+                        }
+                        result[k] = v;
+                    });
+                    return result;
+                }
+
                 function genCurl(d) {
                     var method = (d.method || 'GET').toUpperCase();
                     var url = d.url || '';
@@ -559,20 +601,25 @@
                     if (typeof b === 'string') { try { b = JSON.parse(b); } catch(e) { b = {}; } }
                     var ct = h['Content-Type'] || h['content-type'] || '';
                     var isMP = ct.indexOf('multipart/form-data') >= 0;
+                    var hasJsonCT = ct.indexOf('application/json') >= 0;
                     var parts = ["curl -L -X " + method + " '" + url + "'"];
+                    if (method !== 'GET' && typeof b === 'object' && Object.keys(b).length > 0 && !isMP && !hasJsonCT) {
+                        parts.push("  -H 'Content-Type: application/json'");
+                    }
                     Object.keys(h).forEach(function(k) {
                         if (AUTO_HEADERS[k.toLowerCase()]) return;
                         if (isMP && k.toLowerCase() === 'content-type') return;
                         parts.push("  -H '" + k + ": " + String(h[k]).replace(/'/g, "'\\''") + "'");
                     });
                     if (method !== 'GET' && typeof b === 'object' && Object.keys(b).length > 0) {
-                        if (ct.indexOf('application/json') >= 0) {
-                            parts.push("  -d '" + JSON.stringify(b).replace(/'/g, "'\\''") + "'");
-                        } else {
+                        if (isMP) {
                             Object.keys(b).forEach(function(k) {
                                 var v = typeof b[k] === 'object' ? JSON.stringify(b[k]) : String(b[k]);
                                 parts.push("  --data-urlencode '" + k + "=" + v.replace(/'/g, "'\\''") + "'");
                             });
+                        } else {
+                            var parsed = parseBodyValues(b);
+                            parts.push("  --data-raw '" + JSON.stringify(parsed, null, 2).replace(/'/g, "'\\''") + "'");
                         }
                     }
                     return parts.join(" \\\n");
