@@ -444,12 +444,6 @@
                     ? JSON.stringify(requestBody, null, 2)
                     : JSON.stringify(requestBody);
                 parts.push("  -d '" + body.replace(/'/g, "'\\''") + "'");
-            } else if (isMultipart) {
-                for (const [k, v] of Object.entries(requestBody)) {
-                    const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
-                    const safeVal = val.replace(/'/g, "'\\''");
-                    parts.push("  -F '" + k + "=" + safeVal + "'");
-                }
             } else {
                 for (const [k, v] of Object.entries(requestBody)) {
                     const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -473,8 +467,7 @@
             .replace(/(-H\s+')([^:]+):\s*([^']*)/g, function(_, flag, key, val) {
                 return flag + '<span class="curl-header-key">' + key + '</span>: <span class="curl-header-val">' + val + '</span>';
             })
-            .replace(/(--?d(?:ata[-\w]*)?)\s+'/g, '<span class="curl-flag">$1</span> \'')
-            .replace(/(-F)\s+'/g, '<span class="curl-flag">$1</span> \'');
+            .replace(/(--?d(?:ata[-\w]*)?)\s+'/g, '<span class="curl-flag">$1</span> \'');
     }
 
     // ============================================================
@@ -575,11 +568,6 @@
                     if (method !== 'GET' && typeof b === 'object' && Object.keys(b).length > 0) {
                         if (ct.indexOf('application/json') >= 0) {
                             parts.push("  -d '" + JSON.stringify(b).replace(/'/g, "'\\''") + "'");
-                        } else if (isMP) {
-                            Object.keys(b).forEach(function(k) {
-                                var v = typeof b[k] === 'object' ? JSON.stringify(b[k]) : String(b[k]);
-                                parts.push("  -F '" + k + "=" + v.replace(/'/g, "'\\''") + "'");
-                            });
                         } else {
                             Object.keys(b).forEach(function(k) {
                                 var v = typeof b[k] === 'object' ? JSON.stringify(b[k]) : String(b[k]);
