@@ -427,21 +427,29 @@
         const parts = [];
         parts.push("curl -L -X " + method + " '" + url + "'");
 
+        const contentType = headers['Content-Type'] || headers['content-type'] || '';
+        const isMultipart = contentType.includes('multipart/form-data');
+
         const headerEntries = Object.entries(headers);
         for (const [key, value] of headerEntries) {
             if (skipAutoHeaders && AUTO_HEADERS.has(key.toLowerCase())) continue;
+            if (isMultipart && key.toLowerCase() === 'content-type') continue;
             const safeVal = String(value).replace(/'/g, "'\\''");
             parts.push("  -H '" + key + ": " + safeVal + "'");
         }
 
         if (method !== 'GET' && Object.keys(requestBody).length > 0) {
-            const contentType = headers['Content-Type'] || headers['content-type'] || '';
-
             if (contentType.includes('application/json')) {
                 const body = prettyBody
                     ? JSON.stringify(requestBody, null, 2)
                     : JSON.stringify(requestBody);
                 parts.push("  -d '" + body.replace(/'/g, "'\\''") + "'");
+            } else if (isMultipart) {
+                for (const [k, v] of Object.entries(requestBody)) {
+                    const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
+                    const safeVal = val.replace(/'/g, "'\\''");
+                    parts.push("  -F '" + k + "=" + safeVal + "'");
+                }
             } else {
                 for (const [k, v] of Object.entries(requestBody)) {
                     const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -465,7 +473,8 @@
             .replace(/(-H\s+')([^:]+):\s*([^']*)/g, function(_, flag, key, val) {
                 return flag + '<span class="curl-header-key">' + key + '</span>: <span class="curl-header-val">' + val + '</span>';
             })
-            .replace(/(--?d(?:ata[-\w]*)?)\s+'/g, '<span class="curl-flag">$1</span> \'');
+            .replace(/(--?d(?:ata[-\w]*)?)\s+'/g, '<span class="curl-flag">$1</span> \'')
+            .replace(/(-F)\s+'/g, '<span class="curl-flag">$1</span> \'');
     }
 
     // ============================================================
@@ -555,15 +564,22 @@
                     if (typeof h === 'string') { try { h = JSON.parse(h); } catch(e) { h = {}; } }
                     var b = d.request || {};
                     if (typeof b === 'string') { try { b = JSON.parse(b); } catch(e) { b = {}; } }
+                    var ct = h['Content-Type'] || h['content-type'] || '';
+                    var isMP = ct.indexOf('multipart/form-data') >= 0;
                     var parts = ["curl -L -X " + method + " '" + url + "'"];
                     Object.keys(h).forEach(function(k) {
                         if (AUTO_HEADERS[k.toLowerCase()]) return;
+                        if (isMP && k.toLowerCase() === 'content-type') return;
                         parts.push("  -H '" + k + ": " + String(h[k]).replace(/'/g, "'\\''") + "'");
                     });
                     if (method !== 'GET' && typeof b === 'object' && Object.keys(b).length > 0) {
-                        var ct = h['Content-Type'] || h['content-type'] || '';
                         if (ct.indexOf('application/json') >= 0) {
                             parts.push("  -d '" + JSON.stringify(b).replace(/'/g, "'\\''") + "'");
+                        } else if (isMP) {
+                            Object.keys(b).forEach(function(k) {
+                                var v = typeof b[k] === 'object' ? JSON.stringify(b[k]) : String(b[k]);
+                                parts.push("  -F '" + k + "=" + v.replace(/'/g, "'\\''") + "'");
+                            });
                         } else {
                             Object.keys(b).forEach(function(k) {
                                 var v = typeof b[k] === 'object' ? JSON.stringify(b[k]) : String(b[k]);
